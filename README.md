@@ -42,7 +42,11 @@ repositorio/
 └── sql/
     ├── 01_ddl.sql
     ├── 02_carga.sql
-    └── 03_consultas.sql
+    ├── 03_consultas.sql
+    ├── 04_views
+    ├── 05_triggers
+    └── 06_seguranca
+    
 ```
 
 ## Como executar
