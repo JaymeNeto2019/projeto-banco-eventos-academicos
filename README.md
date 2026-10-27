@@ -22,4 +22,5 @@ repositorio/
 **Banco:** MySQL 8.0+. **Aplicação:** ver `app/README.md`.
 
 ## Uso de inteligência artificial
-(Preencha com honestidade: quais partes usaram IA, e como o grupo verificou — ver `docs/relatorio-etapa2-esqueleto.md`, seção 9.)
+A utilização de inteligência artificial neste projeto ocorreu de forma complementar para esclarecer dúvidas teóricas, superar bloqueios lógicos e auxiliar na escrita de trechos de código.
+Para garantir a integridade do trabalho, o grupo realizou uma validação rigorosa de todo o material gerado, revisando criticamente a lógica proposta, adaptando as soluções aos padrões exigidos e realizando testes práticos antes da integração final.
