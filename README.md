@@ -1,66 +1,25 @@
-# Sistema de Gestão de Eventos Acadêmicos
+# Gestão de Eventos Acadêmicos — Projeto Final de Laboratório de Banco de Dados (UCB 2026/2)
 
-Projeto da disciplina **Laboratório de Banco de Dados - 2026/2**.
+> Preencha: integrantes, interlocutor e papéis (Etapa 1). Esta é a estrutura **da Etapa 2**.
 
-## Integrantes
-
-- ISAAC BARBOSA DA SILVA
-- ÁTILA DE MELO CANTOARA
-- VICTOR LEMOS DE ABREU OLIVEIRA
-- JOAO PEDRO CARNEIRO IBIAPINO
-- JAYME BERNARDINO DA SILVA NETO
-
-**Turma:** Ciência da Computação  
-**Grupo:** 10
-
-## Tema e escopo
-
-Banco de dados para gestão de eventos acadêmicos, atividades, sessões, salas, participantes, organizadores, inscrições, histórico de status e certificados.
-
-## SGBD
-
-MySQL 8.0 ou superior.
-
-## Estrutura
-
-```text
+```
 repositorio/
 ├── README.md
-├── PASSO_A_PASSO_GITHUB.md
-├── docs/
-│   ├── relatorio-etapa1.pdf
-│   ├── relatorio-etapa1.docx
-│   ├── mer-conceitual.pdf
-│   ├── mer-conceitual.png
-│   ├── mer-conceitual.drawio
-│   ├── mer-conceitual.dot
-│   ├── modelo-logico.pdf
-│   ├── modelo-logico.png
-│   ├── modelo-logico.dot
-│   ├── dicionario-dados.pdf
-│   └── dicionario-dados.docx
-└── sql/
-    ├── 01_ddl.sql
-    ├── 02_carga.sql
-    ├── 03_consultas.sql
-    ├── 04_views
-    ├── 05_triggers
-    └── 06_seguranca
-    
+├── .gitignore               # .env, backup.cnf e 06_usuarios.local.sql NUNCA vão para o Git
+├── .env.example             # modelo das credenciais (sem senhas reais)
+├── docs/                    # Etapa 1 + relatorio-etapa2 (PDF) + esqueleto e roteiro de demonstração
+├── sql/
+│   ├── 01_ddl.sql  02_carga.sql  03_consultas.sql        # Etapa 1
+│   ├── 04_views.sql  05_triggers.sql                      # Etapa 2: relatório, restrição, auditoria
+│   ├── 06_seguranca.sql  06_usuarios.exemplo.sql          # Etapa 2: perfis (GRANT/REVOKE) e usuário da aplicação
+│   ├── 07_estudo_indices.sql  08_carga_volume.sql         # Etapa 2: EXPLAIN antes/depois e dados sintéticos
+│   └── 09_transacao_concorrencia.sql                      # Etapa 2: roteiro das 2 sessões
+├── app/                     # aplicação Flask (ver app/README.md)
+└── backup/                  # backup.sh, restaurar_teste.sh, README_backup.md (plano de backup)
 ```
 
-## Como executar
+**Ordem de execução do banco:** 01 → 02 → (03) → 04 → 05 → 06_seguranca → 06_usuarios.local → *(opcional, para o B4)* 08 → 07.
+**Banco:** MySQL 8.0+. **Aplicação:** ver `app/README.md`.
 
-1. Abra MySQL Workbench (ou outro cliente compatível com MySQL 8.0+).
-2. Execute `sql/01_ddl.sql` inteiro.
-3. Execute `sql/02_carga.sql` inteiro.
-4. Execute `sql/03_consultas.sql` e confira as 15 consultas.
-5. Antes da entrega, apague o banco e repita os passos 2 a 4 do zero.
-
-## Observação sobre os dados
-
-Todos os dados inseridos pelo script de carga são sintéticos e foram criados exclusivamente para fins acadêmicos.
-
-## Uso de IA
-
-Foi utilizado um assistente de IA como apoio à estruturação do domínio, revisão de regras, geração inicial de SQL e documentação. O material deve ser revisado e testado pela equipe antes da entrega.
+## Uso de inteligência artificial
+(Preencha com honestidade: quais partes usaram IA, e como o grupo verificou — ver `docs/relatorio-etapa2-esqueleto.md`, seção 9.)
