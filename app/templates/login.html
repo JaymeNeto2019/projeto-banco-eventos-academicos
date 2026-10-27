@@ -1,0 +1,6 @@
+{% extends 'base.html' %}{% block conteudo %}
+<h2>Entrar</h2>
+<form class="f" method="post"><input type="hidden" name="_csrf" value="{{ csrf }}">
+<label for="login">Login</label><input name="login" id="login" autofocus required>
+<label for="senha">Senha</label><input name="senha" id="senha" type="password" required>
+<button class="btn">Entrar</button></form>{% endblock %}

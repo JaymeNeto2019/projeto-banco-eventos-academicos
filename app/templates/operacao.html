@@ -1,0 +1,6 @@
+{% extends 'base.html' %}{% from '_macros.html' import campo %}{% block conteudo %}
+<h2>{{ titulo }}</h2><p class="info">{{ info }}</p>
+<form class="f" method="post" action="{{ acao }}"><input type="hidden" name="_csrf" value="{{ csrf }}">
+{% for c in campos %}{{ campo(c) }}{% endfor %}
+<label><input type="checkbox" name="simular_falha"> Simular falha no meio da transação (para demonstrar o ROLLBACK)</label>
+<button class="btn">Executar</button></form>{% endblock %}

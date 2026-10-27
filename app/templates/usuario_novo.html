@@ -1,0 +1,7 @@
+{% extends 'base.html' %}{% block conteudo %}
+<h2>Novo usuário da aplicação</h2><p class="info">A senha é guardada como hash bcrypt com sal; nunca em texto claro.</p>
+<form class="f" method="post"><input type="hidden" name="_csrf" value="{{ csrf }}">
+<label for="login">Login</label><input name="login" id="login" required minlength="3">
+<label for="senha">Senha (8+ caracteres)</label><input name="senha" id="senha" type="password" required minlength="8">
+<label for="perfil">Perfil</label><select name="perfil" id="perfil">{% for p in perfis %}<option>{{ p }}</option>{% endfor %}</select>
+<button class="btn">Criar</button></form>{% endblock %}

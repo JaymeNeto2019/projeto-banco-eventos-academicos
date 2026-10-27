@@ -1,0 +1,28 @@
+# Credenciais e segredos (NUNCA versionar)
+.env
+sql/06_usuarios.local.sql
+backup/*.cnf
+backup/dumps/
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=eventos_academicos
+
+# Um usuário MySQL por perfil (criados em sql/06_usuarios.local.sql)
+DB_USER_ADMIN=usr_admin_eventos
+DB_PASS_ADMIN=jayme123
+DB_USER_ORGANIZADOR=usr_organizador
+DB_PASS_ORGANIZADOR=jayme321
+DB_USER_CONSULTA=usr_consulta
+DB_PASS_CONSULTA=isaac123
+DB_USER_AUTH=usr_app_auth
+DB_PASS_AUTH=isaac321
+
+# Chave de assinatura da sessão do Flask (gere uma: python -c "import secrets;print(secrets.token_hex(32))")
+FLASK_SECRET_KEY=joao123
+
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/

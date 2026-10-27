@@ -1,0 +1,5 @@
+{% extends 'base.html' %}{% block conteudo %}
+<h2>Gestão de Eventos Acadêmicos</h2>
+<p>Use o menu para cadastrar dados, consultar, emitir o relatório e executar as operações transacionais.</p>
+<ul>{% for k, e in entidades.items() %}<li><a href="{{ url_for('crud_lista', nome=k) }}">{{ e.titulo }}</a></li>{% endfor %}</ul>
+<p class="info">Cada perfil usa uma conta MySQL diferente: o banco, e não só a tela, decide o que cada um pode fazer.</p>{% endblock %}

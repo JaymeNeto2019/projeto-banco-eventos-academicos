@@ -1,0 +1,8 @@
+{% extends 'base.html' %}{% block conteudo %}
+<h2>{{ e.titulo }}</h2><p><a class="btn" href="{{ url_for('crud_form', nome=nome) }}">Novo</a></p>
+{% if rows %}<div class="wrap"><table><tr>{% for k in e.lista %}<th>{{ k }}</th>{% endfor %}<th></th></tr>
+{% for r in rows %}<tr>{% for k in e.lista %}<td>{{ '' if r[k] is none else r[k] }}</td>{% endfor %}
+<td><a class="btn s" href="{{ url_for('crud_form', nome=nome, pk=r[e.pk]) }}">Editar</a>
+<form class="i" method="post" action="{{ url_for('crud_excluir', nome=nome, pk=r[e.pk]) }}" onsubmit="return confirm('Excluir este registro?')">
+<input type="hidden" name="_csrf" value="{{ csrf }}"><button class="btn r">Excluir</button></form></td></tr>{% endfor %}</table></div>
+<p class="info">Mostrando até 200 registros.</p>{% else %}<p>Nenhum registro.</p>{% endif %}{% endblock %}
