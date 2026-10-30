@@ -49,6 +49,11 @@ post(adm, f"/crud/sala/{sid}/editar", dict(nome="Sala Teste", bloco="Z", capacid
 check("CRUD: alterar sala", total("SELECT capacidade AS n FROM sala WHERE id_sala=%s", (sid,)) == 45)
 post(adm, f"/crud/sala/{sid}/excluir")
 check("CRUD: excluir sala", total("SELECT COUNT(*) AS n FROM sala WHERE id_sala=%s", (sid,)) == 0)
+cat = total("SELECT MIN(id_categoria) AS n FROM categoria_evento"); inst = total("SELECT MIN(id_instituicao) AS n FROM instituicao")
+post(adm, "/crud/evento/novo", dict(id_categoria=cat, id_instituicao_promotora=inst, titulo="Evento CRUD Teste", data_inicio="2026-12-15T08:00",
+     data_fim="2026-12-15T12:00", modalidade="ONLINE", valor_inscricao="0.00", gratuito="on"))
+check("RN12: evento criado pela aplicação nasce com status PLANEJADO no histórico",
+      total("SELECT COUNT(*) AS n FROM historico_status_evento h JOIN evento e ON e.id_evento=h.id_evento WHERE e.titulo='Evento CRUD Teste' AND h.status='PLANEJADO'") >= 1)
 for ent in ("instituicao", "categoria_evento", "evento", "atividade"):
     check(f"CRUD: listagem de {ent}", adm.get(f"/crud/{ent}").status_code == 200)
 
@@ -73,7 +78,14 @@ _cur.execute("INSERT INTO atividade (id_evento, titulo, tipo_atividade, carga_ho
 ativ = _cur.lastrowid
 _cur.execute("INSERT INTO pessoa (nome, email) VALUES ('Participante Teste', %s)", (f"teste-{uuid.uuid4().hex[:8]}@exemplo.test",))
 part = _cur.lastrowid
-_cur.execute("INSERT INTO participante (id_pessoa, tipo_participante) VALUES (%s, 'EXTERNO')", (part,)); _c.commit(); _c.close()
+_cur.execute("INSERT INTO participante (id_pessoa, tipo_participante) VALUES (%s, 'EXTERNO')", (part,))
+_cur.execute("INSERT INTO pessoa (nome, email) VALUES ('Participante Baixa Presenca', %s)", (f"teste-{uuid.uuid4().hex[:8]}@exemplo.test",)); part2 = _cur.lastrowid
+_cur.execute("INSERT INTO participante (id_pessoa, tipo_participante) VALUES (%s, 'EXTERNO')", (part2,))
+_cur.execute("INSERT INTO inscricao_atividade (id_participante, id_atividade, data_inscricao, status_inscricao, percentual_presenca) VALUES (%s, %s, NOW(), 'CONFIRMADA', 50)", (part2, ativ))
+_cur.execute("SELECT MIN(id_sala) FROM sala"); sala = _cur.fetchone()[0]   # 2a atividade com sessao SOBREPOSTA (RN22)
+_cur.execute("INSERT INTO atividade (id_evento,titulo,tipo_atividade,carga_horaria,vagas) VALUES (%s,'Atividade Sobreposta','OFICINA',2.0,10)", (ev,)); ativ2 = _cur.lastrowid
+_cur.execute("INSERT INTO sessao_atividade (id_atividade,numero_sessao,id_sala,inicio,fim) VALUES (%s,1,%s,'2026-12-10 09:00','2026-12-10 11:00'),(%s,1,%s,'2026-12-10 10:00','2026-12-10 12:00')", (ativ, sala, ativ2, sala))
+_c.commit(); _c.close()
 
 antes = total("SELECT COUNT(*) AS n FROM inscricao_atividade")
 post(adm, "/operacoes/inscrever", dict(id_participante=part, id_atividade=ativ, simular_falha="on"))
@@ -81,14 +93,17 @@ check("falha simulada: ROLLBACK, banco íntegro (mesma contagem)", total("SELECT
 post(adm, "/operacoes/inscrever", dict(id_participante=part, id_atividade=ativ))
 check("inscrição com sucesso: COMMIT", total("SELECT COUNT(*) AS n FROM inscricao_atividade") == antes + 1)
 r = post(adm, "/operacoes/inscrever", dict(id_participante=part, id_atividade=ativ)); check("inscrição duplicada: mensagem amigável", "já existe" in txt(r).lower())
+r = post(adm, "/operacoes/inscrever", dict(id_participante=part, id_atividade=ativ2))
+check("RN22: inscrição CONFIRMADA em horário sobreposto é barrada", "sobreposto" in txt(r) and total("SELECT COUNT(*) AS n FROM inscricao_atividade WHERE id_participante=%s AND id_atividade=%s", (part, ativ2)) == 0)
 
 _c = conectar("ADMIN", "t_admin"); _cur = _c.cursor()  # presença registrada (dispara a auditoria com autor t_admin)
-_cur.execute("UPDATE inscricao_atividade SET percentual_presenca = 90 WHERE id_atividade=%s AND status_inscricao='CONFIRMADA'", (ativ,)); _c.commit(); _c.close()
+_cur.execute("UPDATE inscricao_atividade SET percentual_presenca = 90 WHERE id_atividade=%s AND id_participante=%s AND status_inscricao='CONFIRMADA'", (ativ, part)); _c.commit(); _c.close()
 H = "SELECT COUNT(*) AS n FROM historico_status_evento WHERE id_evento=%s"; C = "SELECT COUNT(*) AS n FROM certificado WHERE id_evento=%s"
 post(adm, "/operacoes/encerrar-evento", dict(id_evento=ev, minimo="75", simular_falha="on"))
 check("encerrar evento com falha: nada gravado nas 2 tabelas", total(H, (ev,)) == 1 and total(C, (ev,)) == 0)
 post(adm, "/operacoes/encerrar-evento", dict(id_evento=ev, minimo="75"))
 check("encerrar evento com sucesso: status + certificado (2 tabelas, 1 transação)", total(H, (ev,)) == 2 and total(C, (ev,)) == 1)
+check("RN26: média de presença abaixo de 75% NÃO recebe certificado", total("SELECT COUNT(*) AS n FROM certificado WHERE id_evento=%s AND id_participante=%s", (ev, part2)) == 0)
 r = post(adm, "/operacoes/encerrar-evento", dict(id_evento=ev, minimo="75"))
 check("encerrar de novo é barrado (sem status duplicado)", "não pode ser encerrado novamente" in txt(r) and total(H, (ev,)) == 2)
 _c = conectar("ADMIN"); _cur = _c.cursor()  # reabre o evento por fora para provocar o erro de certificado duplicado

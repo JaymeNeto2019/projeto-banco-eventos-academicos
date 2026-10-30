@@ -46,7 +46,8 @@ FROM evento WHERE titulo LIKE 'Evento sintético %';
 -- 3) Atividades (3 por evento) e uma sessão por atividade
 INSERT INTO atividade (id_evento, titulo, tipo_atividade, carga_horaria, vagas)
 SELECT e.id_evento, CONCAT('Atividade sintética ', k.k, ' do evento ', e.id_evento),
-       ELT(1 + (e.id_evento + k.k) % 4, 'PALESTRA', 'MINICURSO', 'MESA_REDONDA', 'OFICINA'), 2.0 * k.k, 20 + 10 * k.k
+       ELT(1 + (e.id_evento + k.k) % 4, 'PALESTRA', 'MINICURSO', 'MESA_REDONDA', 'OFICINA'), 2.0 * k.k,
+       LEAST(20 + 10 * k.k, (SELECT MIN(capacidade) FROM sala))   -- RN18: vagas não superam a menor sala existente
 FROM evento e JOIN (SELECT 1 AS k UNION ALL SELECT 2 UNION ALL SELECT 3) k
 WHERE e.titulo LIKE 'Evento sintético %';
 

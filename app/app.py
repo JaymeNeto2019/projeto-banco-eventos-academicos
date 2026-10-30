@@ -194,7 +194,10 @@ def crud_form(nome, pk=None):
             cols = [c["n"] for c in e["campos"]]
             try:
                 if pk is None:
-                    executar(cn(), f"INSERT INTO {nome} ({', '.join(cols)}) VALUES ({', '.join(['%s'] * len(cols))})", vals)
+                    _, novo_id = executar(cn(), f"INSERT INTO {nome} ({', '.join(cols)}) VALUES ({', '.join(['%s'] * len(cols))})", vals)
+                    if nome == "evento":  # RN12: todo evento nasce com status inicial no histórico (mesma transação)
+                        executar(cn(), "INSERT INTO historico_status_evento (id_evento, sequencia, status, data_hora, observacao) "
+                                       "VALUES (%s, 1, 'PLANEJADO', NOW(), 'Criado pela aplicação')", (novo_id,))
                 else:
                     executar(cn(), f"UPDATE {nome} SET {', '.join(c + ' = %s' for c in cols)} WHERE {e['pk']} = %s", vals + [pk])
                 cn().commit()
@@ -357,6 +360,16 @@ def op_inscrever():
             conf = consultar(c, "SELECT COUNT(*) AS n FROM inscricao_atividade "
                                 "WHERE id_atividade = %s AND status_inscricao = 'CONFIRMADA'", (ativ,))[0]["n"]
             status = "CONFIRMADA" if conf < at[0]["vagas"] else "LISTA_ESPERA"
+            if status == "CONFIRMADA":  # RN22: sem inscrições CONFIRMADAS em sessões com horários sobrepostos
+                if consultar(c, """SELECT 1 AS x FROM sessao_atividade novo
+                                  JOIN sessao_atividade velho ON velho.id_atividade <> novo.id_atividade
+                                       AND velho.inicio < novo.fim AND velho.fim > novo.inicio
+                                  JOIN inscricao_atividade ia ON ia.id_atividade = velho.id_atividade
+                                       AND ia.id_participante = %s AND ia.status_inscricao = 'CONFIRMADA'
+                                  WHERE novo.id_atividade = %s LIMIT 1""", (part, ativ)):
+                    c.rollback()
+                    flash("RN22: o participante já tem inscrição CONFIRMADA em horário sobreposto.", "erro")
+                    return redirect(url_for("op_inscrever"))
             executar(c, "INSERT INTO inscricao_atividade (id_participante, id_atividade, data_inscricao, status_inscricao) "
                         "VALUES (%s, %s, NOW(), %s)", (part, ativ, status))
             if simular:
@@ -411,8 +424,10 @@ def op_encerrar():
                        NOW(), SUM(a.carga_horaria)
                 FROM inscricao_atividade ia
                 JOIN atividade a ON a.id_atividade = ia.id_atividade
-                WHERE a.id_evento = %s AND ia.status_inscricao = 'CONFIRMADA' AND ia.percentual_presenca >= %s
-                GROUP BY ia.id_participante, a.id_evento""", (ev, minimo))
+                WHERE a.id_evento = %s AND ia.status_inscricao = 'CONFIRMADA'
+                GROUP BY ia.id_participante, a.id_evento
+                HAVING COUNT(ia.percentual_presenca) = COUNT(*)      -- presença registrada em TODAS as atividades confirmadas
+                   AND AVG(ia.percentual_presenca) >= %s""", (ev, minimo))   # RN26: média de presença >= mínimo
             if simular:
                 raise FalhaSimulada()
             c.commit()
