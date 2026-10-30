@@ -1,5 +1,20 @@
-{% extends 'base.html' %}{% block conteudo %}
-<h2>Gestão de Eventos Acadêmicos</h2>
-<p>Use o menu para cadastrar dados, consultar, emitir o relatório e executar as operações transacionais.</p>
-<ul>{% for k, e in entidades.items() %}<li><a href="{{ url_for('crud_lista', nome=k) }}">{{ e.titulo }}</a></li>{% endfor %}</ul>
-<p class="info">Cada perfil usa uma conta MySQL diferente: o banco, e não só a tela, decide o que cada um pode fazer.</p>{% endblock %}
+{% extends 'base.html' %}
+{% block titulo %}Início | Agenda Acadêmica{% endblock %}
+{% block conteudo %}
+<div class="page-heading"><h1>Central de gestão</h1><p>Organize a programação e acompanhe a vida acadêmica.</p></div>
+<section class="home-intro">
+  <div class="panel home-copy">
+    <h2>Boa tarde, {{ login }}.</h2>
+    <p>Escolha uma área abaixo para cadastrar dados, consultar resultados ou executar operações.</p>
+    <p class="info">As permissões continuam sendo controladas pelas contas de acesso configuradas no MySQL.</p>
+  </div>
+  <div class="panel home-aside"><div><strong>{{ entidades|length }}</strong><span>áreas de gestão</span></div></div>
+</section>
+<section class="entity-grid" aria-label="Áreas de gestão">
+  {% for k, e in entidades.items() %}
+  <a class="entity-card" href="{{ url_for('crud_lista', nome=k) }}">
+    <strong>{{ e.titulo }}</strong><span>Gerenciar →</span>
+  </a>
+  {% endfor %}
+</section>
+{% endblock %}

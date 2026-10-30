@@ -76,7 +76,11 @@ def login():
     if request.method == "POST":
         lg = request.form.get("login", "").strip()
         senha = request.form.get("senha", "").encode()
-        c = conectar("AUTH")  # conta mínima: só lê usuario_app e atualiza ultimo_login
+        try:
+            c = conectar("AUTH")  # conta mínima: só lê usuario_app e atualiza ultimo_login
+        except (KeyError, mysql.connector.Error) as e:
+            flash("A configuração do banco não está disponível. Preencha o arquivo .env e confira o MySQL.", "erro")
+            return render_template("login.html")
         try:
             rows = consultar(c, "SELECT id_usuario, senha_hash, perfil, ativo FROM usuario_app WHERE login = %s", (lg,))
             u = rows[0] if rows else None

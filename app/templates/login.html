@@ -1,6 +1,31 @@
-{% extends 'base.html' %}{% block conteudo %}
-<h2>Entrar</h2>
-<form class="f" method="post"><input type="hidden" name="_csrf" value="{{ csrf }}">
-<label for="login">Login</label><input name="login" id="login" autofocus required>
-<label for="senha">Senha</label><input name="senha" id="senha" type="password" required>
-<button class="btn">Entrar</button></form>{% endblock %}
+{% extends 'base.html' %}
+{% block titulo %}Entrar | Agenda Acadêmica{% endblock %}
+{% block conteudo %}
+<div class="auth-layout">
+  <section class="auth-story" aria-label="Agenda Acadêmica">
+    <div class="brand"><div class="brand-mark">EA</div><span>Agenda Acadêmica</span></div>
+    <div>
+      <h1>Conhecimento em movimento.</h1>
+      <p>Organize eventos, acompanhe inscrições, salas e participações em um ambiente centralizado para a comunidade acadêmica.</p>
+    </div>
+    <div class="info" style="color:#bcd0c6">Sistema integrado de eventos acadêmicos</div>
+  </section>
+  <section class="auth-panel">
+    <div class="auth-card">
+      <h2>Bem-vindo de volta</h2>
+      <p>Entre com suas credenciais institucionais.</p>
+      <form class="f" method="post">
+        <input type="hidden" name="_csrf" value="{{ csrf }}">
+        <label for="login">Usuário</label>
+        <input name="login" id="login" autocomplete="username" autofocus required>
+        <label for="senha">Senha</label>
+        <div class="password-wrap">
+          <input name="senha" id="senha" type="password" autocomplete="current-password" required>
+          <button class="password-toggle" type="button" data-target="senha" aria-label="Mostrar senha">Mostrar</button>
+        </div>
+        <button class="btn" type="submit">Acessar plataforma</button>
+      </form>
+    </div>
+  </section>
+</div>
+{% endblock %}
