@@ -21,10 +21,11 @@ SELECT CONCAT(ELT(1 + i % 8, 'Ana','Bruno','Carla','Diego','Elisa','Felipe','Gab
        DATE_ADD('1975-01-01', INTERVAL (i * 7) % 11000 DAY)
 FROM n;
 
-INSERT INTO participante (id_pessoa, tipo_participante, matricula_academica)
+INSERT INTO participante (id_pessoa, tipo_participante, matricula_academica, id_instituicao_origem)
 SELECT id_pessoa,
        ELT(1 + id_pessoa % 3, 'ALUNO', 'PROFESSOR', 'EXTERNO'),
-       IF(id_pessoa % 3 = 0, CONCAT('SINT', id_pessoa), NULL)
+       IF(id_pessoa % 3 = 0, CONCAT('SINT', id_pessoa), NULL),
+       IF(id_pessoa % 2 = 0, (SELECT MIN(id_instituicao) FROM instituicao), NULL)  -- metade com instituição de origem
 FROM pessoa WHERE email LIKE 'sint%@exemplo.test';
 
 -- 2) Eventos (categoria e instituição escolhidas entre as existentes)

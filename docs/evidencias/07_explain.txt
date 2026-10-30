@@ -1,0 +1,62 @@
+EVIDENCIA B4 - estudos de EXPLAIN ANALYZE (MySQL 8.0, dados sinteticos de 08_carga_volume.sql)
+Cada medida = EXPLAIN ANALYZE executado 3 vezes; reporta-se a MEDIANA do tempo do no raiz (ms).
+
+====================================================================================================
+ESTUDO 1 - inscricoes em um intervalo de datas
+Consulta: SELECT status_inscricao, COUNT(*) AS total FROM inscricao_atividade WHERE data_inscricao BETWEEN '2025-01-01' AND '2025-06-30 23:59:59' GROUP BY status_inscricao
+Volume: 120009 linhas em inscricao_atividade
+
+-- ANTES do indice (tempos: [61.1, 60.6, 63.3] ms; mediana 61.1 ms) | tabela: 10.52 MB dados, 14.03 MB indices
+Plano:
+   -> Table scan on <temporary>  (actual time=61.1..61.1 rows=3 loops=1)
+       -> Aggregate using temporary table  (actual time=61.1..61.1 rows=3 loops=1)
+           -> Filter: (inscricao_atividade.data_inscricao between '2025-01-01' and '2025-06-30 23:59:59')  (cost=11681 rows=12791) (actual time=0.214..53
+               -> Table scan on inscricao_atividade  (cost=11681 rows=115131) (actual time=0.208..23.2 rows=120009 loops=1)
+
+-- DEPOIS: CREATE INDEX idx_inscricao_data ON inscricao_atividade (data_inscricao, status_inscricao)
+   (tempos: [18.9, 17.6, 17.9] ms; mediana 17.9 ms) | tabela: 10.52 MB dados, 19.55 MB indices (+5.52 MB)
+Plano:
+   -> Table scan on <temporary>  (actual time=18.9..18.9 rows=3 loops=1)
+       -> Aggregate using temporary table  (actual time=18.9..18.9 rows=3 loops=1)
+           -> Filter: (inscricao_atividade.data_inscricao between '2025-01-01' and '2025-06-30 23:59:59')  (cost=9264 rows=44090) (actual time=0.196..11.
+               -> Covering index range scan on inscricao_atividade using idx_inscricao_data over ('2025-01-01 00:00:00' <= data_inscricao <= '2025-06-30 
+
+>> Resultado: 61.1 ms -> 17.9 ms (reducao de 71%).
+====================================================================================================
+ESTUDO 2 - busca de pessoa pelo inicio do nome (LIKE 'Ana S%')
+Consulta: SELECT id_pessoa, nome, email FROM pessoa WHERE nome LIKE 'Ana S%'
+Volume: 50009 linhas em pessoa
+
+-- ANTES do indice (tempos: [11.8, 10.6, 10.5] ms; mediana 10.6 ms) | tabela: 4.52 MB dados, 3.52 MB indices
+Plano:
+   -> Filter: (pessoa.nome like 'Ana S%')  (cost=4995 rows=5469) (actual time=0.0327..11.8 rows=1250 loops=1)
+       -> Table scan on pessoa  (cost=4995 rows=49227) (actual time=0.024..8.78 rows=50009 loops=1)
+
+-- DEPOIS: CREATE INDEX idx_pessoa_nome ON pessoa (nome)
+   (tempos: [3.2, 2.35, 2.16] ms; mediana 2.35 ms) | tabela: 4.52 MB dados, 6.03 MB indices (+2.51 MB)
+Plano:
+   -> Index range scan on pessoa using idx_pessoa_nome over ('Ana S' <= nome <= 'Ana S???????????????????????????????????????????????????????????????????
+
+>> Resultado: 10.6 ms -> 2.35 ms (reducao de 78%).
+====================================================================================================
+ESTUDO 3 - sessoes de uma sala em um periodo
+Consulta: SELECT id_atividade, numero_sessao, inicio, fim FROM sessao_atividade WHERE id_sala = 1 AND inicio BETWEEN '2025-07-01' AND '2025-12-31 23:59:59' ORDER BY inicio
+Volume: 6002 linhas em sessao_atividade
+
+-- ANTES do indice (tempos: [3.55, 3.53, 3.62] ms; mediana 3.55 ms) | tabela: 0.31 MB dados, 0.42 MB indices
+Plano:
+   -> Sort: sessao_atividade.inicio  (cost=65.7 rows=3002) (actual time=3.53..3.55 rows=508 loops=1)
+       -> Filter: (sessao_atividade.inicio between '2025-07-01' and '2025-12-31 23:59:59')  (cost=65.7 rows=3002) (actual time=0.413..3.41 rows=508 loops
+           -> Index lookup on sessao_atividade using fk_sessao_sala (id_sala=1)  (cost=65.7 rows=3002) (actual time=0.391..2.61 rows=3002 loops=1)
+
+-- DEPOIS: CREATE INDEX idx_sessao_sala_inicio ON sessao_atividade (id_sala, inicio)
+   (tempos: [0.992, 0.947, 0.887] ms; mediana 0.947 ms) | tabela: 0.31 MB dados, 0.42 MB indices (+0.00 MB)
+Plano:
+   -> Index range scan on sessao_atividade using idx_sessao_sala_inicio over (id_sala = 1 AND '2025-07-01 00:00:00' <= inicio <= '2025-12-31 23:59:59'), 
+
+>> Resultado: 3.55 ms -> 0.947 ms (reducao de 73%).
+====================================================================================================
+CONTRAEXEMPLO (ESTUDO 2): LIKE com curinga no inicio NAO usa o indice como busca:
+   mediana 18.8 ms; plano:
+   -> Filter: (pessoa.nome like '%Souza%')  (cost=5002 rows=5477) (actual time=5.33..23.1 rows=5001 loops=1)
+       -> Covering index scan on pessoa using idx_pessoa_nome  (cost=5002 rows=49301) (actual time=0.0892..11.4 rows=50009 loops=1)

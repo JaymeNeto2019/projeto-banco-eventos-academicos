@@ -1,0 +1,21 @@
+EVIDENCIA B3 - transacao multitabela: ROLLBACK, falha no meio, COMMIT (evento 1; tabelas historico_status_evento e certificado)
+
+== Estado inicial
+historico	certificados
+2	1
+
+== 1) ROLLBACK provocado
+momento	historico
+dentro da transacao	3
+historico	certificados
+2	1
+
+== 2) FALHA NO MEIO: 1o INSERT ok, 2o INSERT viola FK (participante inexistente) -> ROLLBACK
+ERROR 1452 (23000) at line 3: Cannot add or update a child row: a foreign key constraint fails (`eventos_academicos`.`certificado`, CONSTRAINT `fk_certificado_participante` FOREIGN KEY (`id_participante`) REFERENCES `participante` (`id_pessoa`) ON DELETE RESTRICT ON UPDATE CASCADE)
+-- (a conexao encerrou sem COMMIT: nada foi gravado) estado depois:
+historico	certificados
+2	1
+
+== 3) SUCESSO: COMMIT
+historico	certificados
+3	2

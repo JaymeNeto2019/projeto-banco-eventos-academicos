@@ -1,0 +1,40 @@
+== Login e senha com hash+sal ==
+PASSOU  login com senha errada é recusado
+PASSOU  login ADMIN ok
+PASSOU  senha gravada como hash bcrypt (nunca texto claro)
+PASSOU  POST sem token CSRF é rejeitado (400)
+== CRUD e tratamento de erro ==
+PASSOU  CRUD: criar sala
+PASSOU  restrição UNIQUE vira mensagem amigável
+PASSOU  restrição CHECK vira mensagem amigável
+PASSOU  CRUD: alterar sala
+PASSOU  CRUD: excluir sala
+PASSOU  CRUD: listagem de instituicao
+PASSOU  CRUD: listagem de categoria_evento
+PASSOU  CRUD: listagem de evento
+PASSOU  CRUD: listagem de atividade
+== Consultas parametrizadas, relatório e SQL injection ==
+PASSOU  consulta de ocupação (JOIN+GROUP BY+HAVING)
+PASSOU  consulta de participação
+PASSOU  injeção ' OR '1'='1 tratada como texto (sem erro, sem vazamento)
+PASSOU  injeção '; DROP TABLE ... não executa
+PASSOU  relatório consolidado (view)
+== Transações (B3) ==
+PASSOU  falha simulada: ROLLBACK, banco íntegro (mesma contagem)
+PASSOU  inscrição com sucesso: COMMIT
+PASSOU  inscrição duplicada: mensagem amigável
+PASSOU  encerrar evento com falha: nada gravado nas 2 tabelas
+PASSOU  encerrar evento com sucesso: status + certificado (2 tabelas, 1 transação)
+PASSOU  encerrar de novo é barrado (sem status duplicado)
+PASSOU  certificado duplicado: erro amigável e o status ENCERRADO também foi desfeito (ROLLBACK)
+== Perfis e auditoria (B5/B6) ==
+PASSOU  organizador consegue listar eventos
+PASSOU  organizador NÃO acessa auditoria (negado pelo banco)
+PASSOU  organizador NÃO exclui evento (negado pelo banco)
+PASSOU  consulta vê a agenda pública
+PASSOU  consulta NÃO lê tabelas (negado pelo banco)
+PASSOU  consulta NÃO vê o relatório
+PASSOU  admin vê a auditoria
+PASSOU  auditoria registrou o autor da aplicação (não o usuário do banco)
+
+33/33 verificações passaram

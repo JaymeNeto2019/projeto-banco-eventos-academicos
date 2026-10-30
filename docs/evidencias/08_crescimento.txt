@@ -1,0 +1,37 @@
+EVIDENCIA B7 - tamanho atual e estimativa de crescimento em 2 anos (MySQL 8.0)
+
+1) Tamanho medido (dados + indices) no banco com carga sintetica:
+tabela                        linhas  dados MB  indices MB  bytes/linha
+pessoa                         48646      4.52        6.03          227
+participante                   50628      2.52        2.78          110
+evento                          2006      0.20        0.22          221
+historico_status_evento         2008      0.12        0.08          106
+atividade                       6004      1.52        0.16          292
+sessao_atividade                6002      0.31        0.42          128
+inscricao_atividade           111191     10.52       19.55          284
+certificado                        3      0.02        0.05          n/d
+auditoria                          4      0.02        0.02          n/d
+
+2) Hipoteses de crescimento (AJUSTE aos numeros reais esperados pelo grupo):
+   eventos_ano = 120
+   ativ_por_evento = 3
+   insc_por_ativ = 40
+   cert_por_evento = 60
+   pessoas_novas_ano = 2000
+   aud_por_insc = 0.5
+
+3) Projecao em 2 anos (linhas e tamanho = linhas x bytes/linha medido; nao inclui binlog nem backups):
+tabela                      linhas (2 anos)   tamanho MB
+pessoa                                4,000          0.9
+participante                          4,000          0.4
+evento                                  240          0.1
+historico_status_evento                 720          0.1
+atividade                               720          0.2
+sessao_atividade                      1,080          0.1
+inscricao_atividade                  28,800          7.8
+certificado                          14,400          3.0
+auditoria                            14,400          4.8
+TOTAL                                               17.4   (~0.02 GB)
+
+Tabelas de maior movimento: inscricao_atividade e auditoria (>95% das linhas). Candidatas a particionamento/arquivamento por ano (data_inscricao, data_hora)
+se passarem de dezenas de milhoes de linhas; no volume projetado acima o crescimento e administravel sem particionar.
