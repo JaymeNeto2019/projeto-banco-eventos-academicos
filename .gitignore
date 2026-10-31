@@ -1,0 +1,11 @@
+# Credenciais e segredos (NUNCA versionar)
+.env
+sql/06_usuarios.local.sql
+backup/*.cnf
+backup/dumps/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
