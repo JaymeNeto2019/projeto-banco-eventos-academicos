@@ -1,7 +1,7 @@
 -- Etapa adicional: cadastro público sem fornecer INSERT direto à conta de autenticação.
 -- Executar UMA VEZ como administrador do MySQL (após 06_seguranca.sql).
 -- Reexecutável. A conta AUTH recebe somente EXECUTE nesta procedure.
-USE eventos_academicos_final;
+USE eventos_academicos;
 
 DROP PROCEDURE IF EXISTS cadastrar_usuario_publico;
 DELIMITER $$
@@ -23,5 +23,5 @@ BEGIN
 END$$
 DELIMITER ;
 
-GRANT EXECUTE ON PROCEDURE eventos_academicos_final.cadastrar_usuario_publico
+GRANT EXECUTE ON PROCEDURE eventos_academicos.cadastrar_usuario_publico
 TO 'r_autenticacao';
