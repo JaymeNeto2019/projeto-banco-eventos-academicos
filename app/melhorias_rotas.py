@@ -23,6 +23,8 @@ def registrar_rotas(app, cn, consultar, executar, mensagem_erro, perfis_permitid
             nome = request.form.get('nome', '').strip()
             email = request.form.get('email', '').strip()
             matricula = request.form.get('matricula_academica', '').strip()
+            tipo = request.form.get('tipo_participante', '').strip()
+            tipo = request.form.get('tipo_participante', '').strip()
 
             if tipo == 'ALUNO' and not matricula:
                 flash('Informe a matrícula do aluno.', 'erro')
