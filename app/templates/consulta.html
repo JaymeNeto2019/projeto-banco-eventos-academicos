@@ -1,4 +1,0 @@
-{% extends 'base.html' %}{% from '_macros.html' import tabela, campo %}{% block conteudo %}
-<h2>{{ titulo }}</h2><p class="info">{{ sql_info }}</p>
-{% if campos %}<form class="f" method="get">{% for c in campos %}{{ campo(c, v.get(c.n, '')) }}{% endfor %}<button class="btn">Consultar</button></form><br>{% endif %}
-{{ tabela(rows) }}{% endblock %}
