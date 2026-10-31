@@ -1,0 +1,27 @@
+EVIDENCIA B2 - SQL injection resistida (aplicacao Flask, consultas parametrizadas)
+
+[busca normal (sigla UT)] GET /consulta/participacao?instituicao=UT&minimo=0
+  HTTP 200 | linhas retornadas: 3 | 'Nenhum resultado': False | excecao do driver exibida: False
+
+[INJECAO 1 (tautologia)] GET /consulta/participacao?instituicao=%27+OR+%271%27%3D%271&minimo=0
+  HTTP 200 | linhas retornadas: 0 | 'Nenhum resultado': True | excecao do driver exibida: False
+
+[INJECAO 2 (UNION)] GET /consulta/participacao?instituicao=%27+UNION+SELECT+email%2C1%2C1%2C1+FROM+pessoa--+&minimo=0
+  HTTP 200 | linhas retornadas: 0 | 'Nenhum resultado': True | excecao do driver exibida: False
+
+[INJECAO 3 (comando destrutivo)] GET /consulta/participacao?tipo=ALUNO%27%3B+DROP+TABLE+instituicao%3B--&minimo=0
+  HTTP 200 | linhas retornadas: 0 | 'Nenhum resultado': True | excecao do driver exibida: False
+
+Tabela instituicao existe e manteve 1 linha(s) (antes: 1). O texto digitado foi tratado como DADO, nunca como SQL.
+Trecho do codigo (app.py): WHERE (%s IS NULL OR i.sigla LIKE CONCAT('%%', %s, '%%'))  -> valores enviados em tupla de parametros ao driver.
+
+
+EVIDENCIA B3 - concorrencia pela APLICACAO: duas inscricoes simultaneas na ULTIMA vaga
+Atividade 8197 com vagas=1. Participantes 65543 (usuario 1) e 65544 (usuario 2).
+  Usuario 1 (segura o bloqueio 4 s): enviou em t= 0.3s, terminou em t= 4.4s
+  Usuario 2 (chega 1 s depois): enviou em t= 1.4s, terminou em t= 4.4s
+
+Resultado final no banco (status de cada inscricao):
+   {'id_participante': 65543, 'status_inscricao': 'CONFIRMADA', 'hora': datetime.timedelta(seconds=7614)}
+   {'id_participante': 65544, 'status_inscricao': 'LISTA_ESPERA', 'hora': datetime.timedelta(seconds=7614)}
+Confirmadas: 1 (limite 1). Sem o SELECT ... FOR UPDATE as duas poderiam ler 0 confirmadas e ambas ficariam CONFIRMADA.

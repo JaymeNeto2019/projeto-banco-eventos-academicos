@@ -1,0 +1,21 @@
+EVIDENCIA B7 - backup (mysqldump) e teste de restauracao em banco temporario
+Backup OK: /tmp/dumps_teste/eventos_academicos_20261027_020731.sql.gz (1.9M)
+
+Restaurando /tmp/dumps_teste/eventos_academicos_20261027_020731.sql.gz em eventos_academicos_restore_test ...
+atividade                    original=6006     restaurado=6006     ok
+auditoria                    original=4        restaurado=4        ok
+categoria_evento             original=2        restaurado=2        ok
+certificado                  original=3        restaurado=3        ok
+evento                       original=2006     restaurado=2006     ok
+historico_status_evento      original=2008     restaurado=2008     ok
+inscricao_atividade          original=120009   restaurado=120009   ok
+instituicao                  original=1        restaurado=1        ok
+organizacao_evento           original=0        restaurado=0        ok
+organizador                  original=0        restaurado=0        ok
+participante                 original=50009    restaurado=50009    ok
+pessoa                       original=50009    restaurado=50009    ok
+sala                         original=2        restaurado=2        ok
+sessao_atividade             original=6002     restaurado=6002     ok
+usuario_app                  original=3        restaurado=3        ok
+Gatilhos no restaurado: 2 (original: 2)
+RESTAURAÇÃO VERIFICADA
