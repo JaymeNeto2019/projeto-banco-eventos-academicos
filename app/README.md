@@ -35,7 +35,4 @@ erros de restrição com mensagem compreensível, acesso por perfil (uma conta M
 | Autor na auditoria | `db.conectar` executa `SET @usuario_app = <login>` (lido pelos gatilhos) |
 | Proteção contra SQL injection | só `%s` parametrizado; para o relatório, digite `' OR '1'='1` no campo "Sigla da instituição" de `/consulta/participacao` e registre o resultado (nenhuma linha, nenhum erro) |
 
-## Observações honestas (citar no relatório)
-- Identificadores de tabela/coluna nos CRUDs vêm de `entidades.py` (fixos), nunca da requisição; os valores sempre vão por parâmetro.
-- Há proteção CSRF simples (token de sessão). Não há limite de tentativas de login nem HTTPS: fora do escopo da disciplina.
-- `@usuario_app` é uma variável de sessão: identifica o usuário da aplicação, mas não é prova criptográfica.
+
