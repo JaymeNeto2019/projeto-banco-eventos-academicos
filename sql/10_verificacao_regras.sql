@@ -6,7 +6,7 @@
 -- =============================================================
 USE eventos_academicos;
 
--- RN06 (complemento do CHECK): categoria em ciclo na hierarquia (A -> B -> A). O CHECK só barra "pai de si própria".
+-- RN06 (complemento do gatilho): categoria em ciclo na hierarquia (A -> B -> A). O gatilho só barra "pai de si própria".
 WITH RECURSIVE cadeia AS (
   SELECT id_categoria AS origem, id_categoria_pai AS atual, 1 AS nivel FROM categoria_evento WHERE id_categoria_pai IS NOT NULL
   UNION ALL
