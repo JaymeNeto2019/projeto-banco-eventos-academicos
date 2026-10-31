@@ -1,0 +1,9 @@
+{% extends 'base.html' %}{% block titulo %}Participantes | Agenda Acadêmica{% endblock %}
+{% block conteudo %}
+<div class="page-heading"><h1>Participantes</h1><p>Cadastre pessoas para que possam participar das atividades acadêmicas.</p></div>
+<p><a class="btn" href="{{ url_for('participante_novo') }}">+ Cadastrar participante</a> <a class="btn" href="{{ url_for('op_inscrever') }}">Inscrever em atividade</a></p>
+{% if rows %}<div class="wrap"><table><thead><tr><th>ID</th><th>Nome</th><th>E-mail</th><th>Tipo</th></tr></thead><tbody>
+{% for r in rows %}<tr><td>{{ r.id_pessoa }}</td><td>{{ r.nome }}</td><td>{{ r.email }}</td><td>{{ r.tipo_participante }}</td></tr>{% endfor %}
+</tbody></table></div><p class="info">Até 300 participantes.</p>
+{% else %}<div class="panel empty-state">Nenhum participante cadastrado ainda.</div>{% endif %}
+{% endblock %}

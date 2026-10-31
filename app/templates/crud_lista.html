@@ -1,8 +1,15 @@
-{% extends 'base.html' %}{% block conteudo %}
-<h2>{{ e.titulo }}</h2><p><a class="btn" href="{{ url_for('crud_form', nome=nome) }}">Novo</a></p>
-{% if rows %}<div class="wrap"><table><tr>{% for k in e.lista %}<th>{{ k }}</th>{% endfor %}<th></th></tr>
-{% for r in rows %}<tr>{% for k in e.lista %}<td>{{ '' if r[k] is none else r[k] }}</td>{% endfor %}
-<td><a class="btn s" href="{{ url_for('crud_form', nome=nome, pk=r[e.pk]) }}">Editar</a>
-<form class="i" method="post" action="{{ url_for('crud_excluir', nome=nome, pk=r[e.pk]) }}" onsubmit="return confirm('Excluir este registro?')">
-<input type="hidden" name="_csrf" value="{{ csrf }}"><button class="btn r">Excluir</button></form></td></tr>{% endfor %}</table></div>
-<p class="info">Mostrando até 200 registros.</p>{% else %}<p>Nenhum registro.</p>{% endif %}{% endblock %}
+{% extends 'base.html' %}
+{% block titulo %}{{ e.titulo }} | Agenda Acadêmica{% endblock %}
+{% block conteudo %}
+<div class="page-heading"><h1>{{ e.titulo }}</h1><p>{% if pode_editar %}Gerencie os registros desta área.{% else %}Visualização somente leitura para seu perfil.{% endif %}</p></div>
+{% if pode_editar %}<p><a class="btn" href="{{ url_for('crud_form', nome=nome) }}">+ Novo registro</a></p>{% endif %}
+{% if rows %}
+<div class="wrap"><table><thead><tr>{% for k in e.lista %}<th>{{ k.replace('_',' ')|capitalize }}</th>{% endfor %}{% if pode_editar %}<th>Ações</th>{% endif %}</tr></thead>
+<tbody>{% for r in rows %}<tr>{% for k in e.lista %}<td>{{ '' if r[k] is none else r[k] }}</td>{% endfor %}
+{% if pode_editar %}<td><a class="btn s" href="{{ url_for('crud_form', nome=nome, pk=r[e.pk]) }}">Editar</a>
+{% if perfil == 'ADMIN' %}<form class="i" method="post" action="{{ url_for('crud_excluir', nome=nome, pk=r[e.pk]) }}" onsubmit="return confirm('Excluir este registro?')">
+<input type="hidden" name="_csrf" value="{{ csrf }}"><button class="btn r" type="submit">Excluir</button></form>{% endif %}</td>{% endif %}
+</tr>{% endfor %}</tbody></table></div>
+<p class="info">Mostrando até 200 registros.</p>
+{% else %}<div class="panel empty-state">Nenhum registro encontrado nesta área.</div>{% endif %}
+{% endblock %}

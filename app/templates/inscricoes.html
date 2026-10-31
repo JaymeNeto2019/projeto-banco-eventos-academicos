@@ -1,0 +1,9 @@
+{% extends 'base.html' %}{% block titulo %}Inscrições | Agenda Acadêmica{% endblock %}
+{% block conteudo %}
+<div class="page-heading"><h1>Inscrições em atividades</h1><p>Acompanhe o status das inscrições e o percentual de presença.</p></div>
+<p><a class="btn" href="{{ url_for('op_inscrever') }}">+ Nova inscrição</a> <a class="btn" href="{{ url_for('presencas') }}">Registrar presença</a></p>
+{% if rows %}<div class="wrap"><table><thead><tr><th>ID pessoa</th><th>Participante</th><th>ID atividade</th><th>Atividade</th><th>Evento</th><th>Status</th><th>Presença (%)</th><th>Data</th></tr></thead><tbody>
+{% for r in rows %}<tr><td>{{ r.id_participante }}</td><td>{{ r.participante }}</td><td>{{ r.id_atividade }}</td><td>{{ r.atividade }}</td><td>{{ r.evento }}</td><td>{{ r.status_inscricao }}</td><td>{{ r.percentual_presenca if r.percentual_presenca is not none else '—' }}</td><td>{{ r.data_inscricao }}</td></tr>{% endfor %}
+</tbody></table></div>
+{% else %}<div class="panel empty-state">Ainda não há inscrições registradas.</div>{% endif %}
+{% endblock %}

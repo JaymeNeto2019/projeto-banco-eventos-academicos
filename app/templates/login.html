@@ -6,25 +6,27 @@
     <div class="brand"><div class="brand-mark">EA</div><span>Agenda Acadêmica</span></div>
     <div>
       <h1>Conhecimento em movimento.</h1>
-      <p>Organize eventos, acompanhe inscrições, salas e participações em um ambiente centralizado para a comunidade acadêmica.</p>
+      <p>Gerencie eventos, atividades, inscrições e certificados em um só lugar.</p>
     </div>
-    <div class="info" style="color:#bcd0c6">Sistema integrado de eventos acadêmicos</div>
+    <div class="info" style="color:#bcd0c6">Projeto de Laboratório de Banco de Dados · UCB</div>
   </section>
   <section class="auth-panel">
     <div class="auth-card">
-      <h2>Bem-vindo de volta</h2>
-      <p>Entre com suas credenciais institucionais.</p>
-      <form class="f" method="post">
+      <div class="eyebrow">Área de acesso</div>
+      <h2>Entre na plataforma</h2>
+      <p>Use seu login e sua senha. Ainda não tem uma conta? Cadastre-se abaixo.</p>
+      <form class="f" method="post" action="{{ url_for('login') }}">
         <input type="hidden" name="_csrf" value="{{ csrf }}">
-        <label for="login">Usuário</label>
-        <input name="login" id="login" autocomplete="username" autofocus required>
+        <label for="login">Login</label>
+        <input name="login" id="login" autocomplete="username" maxlength="60" value="{{ request.form.get('login', '') }}" required autofocus>
         <label for="senha">Senha</label>
         <div class="password-wrap">
           <input name="senha" id="senha" type="password" autocomplete="current-password" required>
           <button class="password-toggle" type="button" data-target="senha" aria-label="Mostrar senha">Mostrar</button>
         </div>
-        <button class="btn" type="submit">Acessar plataforma</button>
+        <button class="btn auth-submit" type="submit">Entrar</button>
       </form>
+      <div class="auth-other">Ainda não possui conta? <a href="{{ url_for('cadastro') }}">Criar minha conta</a></div>
     </div>
   </section>
 </div>

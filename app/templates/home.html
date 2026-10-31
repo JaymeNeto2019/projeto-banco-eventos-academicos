@@ -1,20 +1,52 @@
 {% extends 'base.html' %}
-{% block titulo %}Início | Agenda Acadêmica{% endblock %}
+{% block titulo %}Painel principal | Agenda Acadêmica{% endblock %}
 {% block conteudo %}
-<div class="page-heading"><h1>Central de gestão</h1><p>Organize a programação e acompanhe a vida acadêmica.</p></div>
-<section class="home-intro">
-  <div class="panel home-copy">
-    <h2>Boa tarde, {{ login }}.</h2>
-    <p>Escolha uma área abaixo para cadastrar dados, consultar resultados ou executar operações.</p>
-    <p class="info">As permissões continuam sendo controladas pelas contas de acesso configuradas no MySQL.</p>
-  </div>
-  <div class="panel home-aside"><div><strong>{{ entidades|length }}</strong><span>áreas de gestão</span></div></div>
+<div class="page-heading dashboard-heading">
+  <div><div class="eyebrow">PAINEL PRINCIPAL</div><h1>Olá, {{ login }}!</h1>
+  <p>{% if perfil == 'ADMIN' %}Administre toda a programação acadêmica e acompanhe os resultados.{% elif perfil == 'ORGANIZADOR' %}Organize eventos, atividades e inscrições com facilidade.{% else %}Consulte os eventos e valide seus certificados.{% endif %}</p></div>
+  <span class="profile-tag">{{ perfil }}</span>
+</div>
+<section class="dashboard-hero">
+  <div><span class="eyebrow">SISTEMA ACADÊMICO</span><h2>Todas as funcionalidades em um só lugar.</h2>
+  <p>Escolha uma função para começar. O sistema respeita suas permissões no MySQL.</p></div>
+  <a class="btn dashboard-hero-btn" href="{{ url_for('agenda') }}">Ver agenda de eventos →</a>
 </section>
-<section class="entity-grid" aria-label="Áreas de gestão">
+{% if perfil in ('ADMIN','ORGANIZADOR') %}
+<h2 class="dashboard-section">Gestão de dados</h2>
+<section class="dashboard-grid">
   {% for k, e in entidades.items() %}
-  <a class="entity-card" href="{{ url_for('crud_lista', nome=k) }}">
-    <strong>{{ e.titulo }}</strong><span>Gerenciar →</span>
+  <a class="dashboard-card" href="{{ url_for('crud_lista', nome=k) }}">
+    <span class="dashboard-card-icon">{{ '%02d'|format(loop.index) }}</span>
+    <strong>{{ e.titulo }}</strong>
+    <small>{% if perfil == 'ORGANIZADOR' and k not in ['evento','atividade'] %}Visualizar registros{% else %}Cadastrar, consultar e editar{% endif %}</small>
+    <span class="dashboard-card-link">Acessar →</span>
   </a>
   {% endfor %}
+</section>
+<h2 class="dashboard-section">Operações e relatórios</h2>
+<section class="dashboard-grid">
+  {% for label, endpoint, descricao in [
+    ('Cadastrar participante','participantes_lista','Criar pessoas e participantes'),
+    ('Inscrever participante','op_inscrever','Controle de vagas e lista de espera'),
+    ('Inscrições realizadas','inscricoes_lista','Listar e acompanhar inscrições'),
+    ('Registrar presença','presencas','Atualizar presença para emissão de certificados'),
+    ('Encerrar evento','op_encerrar','Emissão transacional de certificados'),
+    ('Ocupação','consulta_ocupacao','Ocupação e disponibilidade das atividades'),
+    ('Participação','consulta_participacao','Participação por instituição'),
+    ('Relatório geral','relatorio','Consulta consolidada por view')
+  ] %}
+  <a class="dashboard-card" href="{{ url_for(endpoint) }}"><span class="dashboard-card-icon">→</span>
+    <strong>{{ label }}</strong><small>{{ descricao }}</small><span class="dashboard-card-link">Acessar →</span></a>
+  {% endfor %}
+</section>
+{% endif %}
+<h2 class="dashboard-section">Consultas e acesso</h2>
+<section class="dashboard-grid">
+  <a class="dashboard-card" href="{{ url_for('agenda') }}"><span class="dashboard-card-icon">A</span><strong>Agenda pública</strong><small>Consulte a programação de eventos.</small><span class="dashboard-card-link">Abrir →</span></a>
+  <a class="dashboard-card" href="{{ url_for('validar_certificado') }}"><span class="dashboard-card-icon">V</span><strong>Validar certificado</strong><small>Confira um código de autenticação.</small><span class="dashboard-card-link">Abrir →</span></a>
+  {% if perfil == 'ADMIN' %}
+  <a class="dashboard-card" href="{{ url_for('usuario_novo') }}"><span class="dashboard-card-icon">+</span><strong>Criar usuário</strong><small>Crie contas de gestor ou de consulta.</small><span class="dashboard-card-link">Abrir →</span></a>
+  <a class="dashboard-card" href="{{ url_for('auditoria') }}"><span class="dashboard-card-icon">≡</span><strong>Auditoria</strong><small>Veja o histórico de alterações.</small><span class="dashboard-card-link">Abrir →</span></a>
+  {% endif %}
 </section>
 {% endblock %}

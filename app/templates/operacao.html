@@ -1,6 +1,17 @@
 {% extends 'base.html' %}{% from '_macros.html' import campo %}{% block conteudo %}
-<h2>{{ titulo }}</h2><p class="info">{{ info }}</p>
+<div class="page-heading"><h1>{{ titulo }}</h1><p>{{ info }}</p></div>
+{% if acao == url_for('op_inscrever') %}<p><a class="btn s" href="{{ url_for('participante_novo') }}">+ Novo participante</a> <a class="btn s" href="{{ url_for('inscricoes_lista') }}">Ver inscrições</a></p>{% endif %}
+{% if acao == url_for('op_encerrar') %}<p><a class="btn s" href="{{ url_for('presencas') }}">Registrar presença primeiro</a></p>{% endif %}
 <form class="f" method="post" action="{{ acao }}"><input type="hidden" name="_csrf" value="{{ csrf }}">
-{% for c in campos %}{{ campo(c) }}{% endfor %}
-<label><input type="checkbox" name="simular_falha"> Simular falha no meio da transação (para demonstrar o ROLLBACK)</label>
-<button class="btn">Executar</button></form>{% endblock %}
+{% for c in campos %}
+  {% if c.n == 'id_participante' and participantes is defined %}
+    <label for="id_participante">Participante</label><select name="id_participante" id="id_participante" required><option value="">Selecione...</option>{% for p in participantes %}<option value="{{ p.id_pessoa }}">{{ p.nome }} (ID {{ p.id_pessoa }})</option>{% endfor %}</select>
+  {% elif c.n == 'id_atividade' and atividades is defined %}
+    <label for="id_atividade">Atividade</label><select name="id_atividade" id="id_atividade" required><option value="">Selecione...</option>{% for a in atividades %}<option value="{{ a.id_atividade }}">{{ a.titulo }} (ID {{ a.id_atividade }})</option>{% endfor %}</select>
+  {% elif c.n == 'id_evento' and eventos is defined %}
+    <label for="id_evento">Evento</label><select name="id_evento" id="id_evento" required><option value="">Selecione...</option>{% for e in eventos %}<option value="{{ e.id_evento }}">{{ e.titulo }} (ID {{ e.id_evento }})</option>{% endfor %}</select>
+  {% else %}{{ campo(c) }}{% endif %}
+{% endfor %}
+<label><input type="checkbox" name="simular_falha"> Simular falha (ROLLBACK) para demonstração</label>
+<button class="btn" type="submit">Executar operação</button></form>
+{% endblock %}

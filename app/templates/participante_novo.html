@@ -1,0 +1,21 @@
+{% extends 'base.html' %}{% block titulo %}Novo participante | Agenda Acadêmica{% endblock %}
+{% block conteudo %}
+<div class="page-heading"><h1>Adicionar participante</h1><p>Registra uma pessoa e sua participação na mesma transação.</p></div>
+<form class="f" method="post" action="{{ url_for('participante_novo') }}">
+  <input type="hidden" name="_csrf" value="{{ csrf }}">
+  <label for="nome">Nome completo</label><input id="nome" name="nome" minlength="3" maxlength="120" value="{{ request.form.get('nome','') }}" required>
+  <label for="email">E-mail</label><input id="email" name="email" type="email" maxlength="160" value="{{ request.form.get('email','') }}" required>
+  <label for="tipo_participante">Tipo de participante</label><select id="tipo_participante" name="tipo_participante">
+  {% for p in ['ALUNO','PROFESSOR','EXTERNO'] %}<option value="{{ p }}" {% if request.form.get('tipo_participante','ALUNO') == p %}selected{% endif %}>{{ p }}</option>{% endfor %}</select>
+    <label for="matricula_academica">
+    Matrícula acadêmica — obrigatória para aluno
+  </label>
+  <input
+    id="matricula_academica"
+    name="matricula_academica"
+    maxlength="30"
+    value="{{ request.form.get('matricula_academica', '') }}"
+  >
+  <button class="btn" type="submit">Salvar participante</button>
+</form>
+{% endblock %}

@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#10382e">
   <title>{% block titulo %}Agenda Acadêmica{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='site.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='melhorias.css') }}">
   <script src="{{ url_for('static', filename='site.js') }}" defer></script>
 </head>
 <body{% if not perfil %} class="auth-page"{% endif %}>
@@ -17,30 +18,38 @@
       <div><strong>Agenda Acadêmica</strong><span>Eventos e participação</span></div>
     </div>
     <nav class="nav" aria-label="Navegação principal">
-      {% if perfil != 'CONSULTA' %}
       <div class="nav-group">
-        <span class="nav-label">Gestão</span>
-        <a href="{{ url_for('home') }}"><span class="nav-index">01</span> Início</a>
-        {% for k in ['instituicao','sala','categoria_evento','evento','atividade'] %}
-        <a href="{{ url_for('crud_lista', nome=k) }}"><span class="nav-index">0{{ loop.index + 1 }}</span> {{ k.replace('_',' ')|capitalize }}</a>
+        <span class="nav-label">Principal</span>
+        <a href="{{ url_for('home') }}"><span class="nav-index">01</span> Painel inicial</a>
+        <a href="{{ url_for('agenda') }}"><span class="nav-index">02</span> Agenda acadêmica</a>
+        <a href="{{ url_for('validar_certificado') }}"><span class="nav-index">03</span> Validar certificado</a>
+      </div>
+      {% if perfil in ('ADMIN', 'ORGANIZADOR') %}
+      <div class="nav-group">
+        <span class="nav-label">Gestão acadêmica</span>
+        {% for k in ['instituicao', 'sala', 'categoria_evento', 'evento', 'atividade'] %}
+        <a href="{{ url_for('crud_lista', nome=k) }}"><span class="nav-index">{{ '%02d'|format(loop.index + 3) }}</span> {{ {'instituicao':'Instituições','sala':'Salas','categoria_evento':'Categorias','evento':'Eventos','atividade':'Atividades'}[k] }}</a>
         {% endfor %}
       </div>
       <div class="nav-group">
-        <span class="nav-label">Operações</span>
-        <a href="{{ url_for('consulta_ocupacao') }}"><span class="nav-index">07</span> Ocupação</a>
-        <a href="{{ url_for('consulta_participacao') }}"><span class="nav-index">08</span> Participação</a>
-        <a href="{{ url_for('relatorio') }}"><span class="nav-index">09</span> Relatório</a>
-        <a href="{{ url_for('op_inscrever') }}"><span class="nav-index">10</span> Inscrever</a>
-        <a href="{{ url_for('op_encerrar') }}"><span class="nav-index">11</span> Encerrar evento</a>
-        <a href="{{ url_for('auditoria') }}"><span class="nav-index">12</span> Auditoria</a>
-        <a href="{{ url_for('usuario_novo') }}"><span class="nav-index">13</span> Novo usuário</a>
+        <span class="nav-label">Inscrições e resultados</span>
+        <a href="{{ url_for('participantes_lista') }}"><span class="nav-index">09</span> Participantes</a>
+        <a href="{{ url_for('inscricoes_lista') }}"><span class="nav-index">10</span> Inscrições</a>
+        <a href="{{ url_for('presencas') }}"><span class="nav-index">11</span> Registrar presença</a>
+        <a href="{{ url_for('op_inscrever') }}"><span class="nav-index">12</span> Inscrever participante</a>
+        <a href="{{ url_for('op_encerrar') }}"><span class="nav-index">10</span> Encerrar evento / certificados</a>
+        <a href="{{ url_for('consulta_ocupacao') }}"><span class="nav-index">11</span> Ocupação de atividades</a>
+        <a href="{{ url_for('consulta_participacao') }}"><span class="nav-index">12</span> Participação por instituição</a>
+        <a href="{{ url_for('relatorio') }}"><span class="nav-index">13</span> Relatório de eventos</a>
       </div>
       {% endif %}
+      {% if perfil == 'ADMIN' %}
       <div class="nav-group">
-        <span class="nav-label">Consulta pública</span>
-        <a href="{{ url_for('agenda') }}"><span class="nav-index">A</span> Agenda</a>
-        <a href="{{ url_for('validar_certificado') }}"><span class="nav-index">V</span> Validar certificado</a>
+        <span class="nav-label">Administração</span>
+        <a href="{{ url_for('usuario_novo') }}"><span class="nav-index">14</span> Criar usuário</a>
+        <a href="{{ url_for('auditoria') }}"><span class="nav-index">15</span> Auditoria</a>
       </div>
+      {% endif %}
     </nav>
     <div class="account">
       <div class="account-user">{{ login }}<small>{{ perfil }}</small></div>
@@ -53,13 +62,13 @@
   <div class="content">
     <header class="topbar">
       <button class="mobile-menu" data-menu-toggle aria-expanded="false" aria-label="Abrir menu">☰</button>
-      <div class="topbar-title">Sistema acadêmico</div>
-      <div class="info">Perfil {{ perfil }}</div>
+      <div class="topbar-title">Gestão de Eventos Acadêmicos</div>
+      <div class="info">{{ login }} · {{ perfil }}</div>
     </header>
     <main>
-      {% for cat, m in get_flashed_messages(with_categories=true) %}<div class="msg {{ cat }}">{{ m }}</div>{% endfor %}
+      {% for cat, m in get_flashed_messages(with_categories=true) %}<div class="msg {{ cat }}" role="alert">{{ m }}</div>{% endfor %}
 {% else %}
-  {% for cat, m in get_flashed_messages(with_categories=true) %}<div class="msg {{ cat }}" style="position:fixed;top:18px;left:50%;z-index:30;transform:translateX(-50%);width:min(420px,calc(100% - 32px))">{{ m }}</div>{% endfor %}
+    {% for cat, m in get_flashed_messages(with_categories=true) %}<div class="msg {{ cat }} auth-msg" role="alert">{{ m }}</div>{% endfor %}
 {% endif %}
       {% block conteudo %}{% endblock %}
 {% if perfil %}

@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% block titulo %}Criar conta | Agenda Acadêmica{% endblock %}
+{% block conteudo %}
+<div class="auth-layout">
+  <section class="auth-story" aria-label="Agenda Acadêmica">
+    <div class="brand"><div class="brand-mark">EA</div><span>Agenda Acadêmica</span></div>
+    <div>
+      <h1>Faça parte da agenda acadêmica.</h1>
+      <p>Crie uma conta para consultar eventos, programação e validar certificados.</p>
+    </div>
+    <div class="info" style="color:#bcd0c6">Cadastro gratuito · Perfil de consulta</div>
+  </section>
+  <section class="auth-panel">
+    <div class="auth-card">
+      <div class="eyebrow">Novo acesso</div>
+      <h2>Crie sua conta</h2>
+      <p>Este cadastro cria uma conta de <strong>consulta</strong>. Contas de gestão são criadas por um administrador.</p>
+      <form class="f" method="post" action="{{ url_for('cadastro') }}">
+        <input type="hidden" name="_csrf" value="{{ csrf }}">
+        <label for="login">Nome de usuário</label>
+        <input id="login" name="login" minlength="3" maxlength="60" pattern="[A-Za-z0-9_.-]+" title="Use letras, números, ponto, hífen ou sublinhado" autocomplete="username" value="{{ request.form.get('login', '') }}" required autofocus>
+        <label for="senha">Senha (mínimo de 8 caracteres)</label>
+        <input id="senha" name="senha" type="password" minlength="8" maxlength="72" autocomplete="new-password" required>
+        <label for="confirmar">Confirmar senha</label>
+        <input id="confirmar" name="confirmar" type="password" minlength="8" maxlength="72" autocomplete="new-password" required>
+        <button class="btn auth-submit" type="submit">Criar conta e entrar</button>
+      </form>
+      <div class="auth-other">Já tem acesso? <a href="{{ url_for('login') }}">Fazer login</a></div>
+    </div>
+  </section>
+</div>
+{% endblock %}
