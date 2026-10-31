@@ -1,0 +1,14 @@
+PACOTE URGENTE - EVENTOS ACADEMICOS
+
+1. Extraia a pasta entrega_urgente na raiz do repositorio (ao lado de app, sql e docs).
+2. Abra terminal PowerShell na raiz do repositorio:
+   python entrega_urgente\verificar_projeto.py
+3. Para aplicar correcoes anteriores use o pacote correcoes_repositorio na raiz:
+   python correcoes_repositorio\aplicar_correcoes.py
+4. Se todas as verificacoes forem OK, abra um terminal e rode:
+   cd app
+   python app.py
+5. No navegador teste http://localhost:5000/login e http://localhost:5000/cadastro
+
+NAO execute teste_fumaca.py no banco de dados importante: esse teste insere e modifica registros.
+O verificador apenas le arquivos e tenta importar bibliotecas; nao conecta ao banco.

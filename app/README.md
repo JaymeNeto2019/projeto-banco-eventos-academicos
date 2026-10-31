@@ -5,7 +5,7 @@ erros de restrição com mensagem compreensível, acesso por perfil (uma conta M
 
 ## Como subir (máquina limpa)
 1. **Banco** (como administrador do MySQL, nesta ordem): `sql/01_ddl.sql`, `02_carga.sql`, `04_views.sql`, `05_triggers.sql`,
-   `06_seguranca.sql` e o seu `06_usuarios.local.sql` (cópia de `06_usuarios.exemplo.sql` com senhas reais).
+   `06_seguranca.sql`, o seu `06_usuarios.local.sql` (cópia de `06_usuarios.exemplo.sql` com senhas reais) **e `sql/11_cadastro_publico.sql`**, necessário para criar contas na tela `/cadastro`. Execute os SQL a partir da raiz do repositório. O banco configurado em `.env` deve ser `eventos_academicos`.
 2. **Credenciais**: `cp .env.example .env` e preencha com as senhas criadas no passo anterior (o `.env` não vai para o Git).
 3. **Dependências** (Python 3.10+):
    ```bash

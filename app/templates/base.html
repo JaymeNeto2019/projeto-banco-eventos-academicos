@@ -37,17 +37,17 @@
         <a href="{{ url_for('inscricoes_lista') }}"><span class="nav-index">10</span> Inscrições</a>
         <a href="{{ url_for('presencas') }}"><span class="nav-index">11</span> Registrar presença</a>
         <a href="{{ url_for('op_inscrever') }}"><span class="nav-index">12</span> Inscrever participante</a>
-        <a href="{{ url_for('op_encerrar') }}"><span class="nav-index">10</span> Encerrar evento / certificados</a>
-        <a href="{{ url_for('consulta_ocupacao') }}"><span class="nav-index">11</span> Ocupação de atividades</a>
-        <a href="{{ url_for('consulta_participacao') }}"><span class="nav-index">12</span> Participação por instituição</a>
-        <a href="{{ url_for('relatorio') }}"><span class="nav-index">13</span> Relatório de eventos</a>
+        <a href="{{ url_for('op_encerrar') }}"><span class="nav-index">13</span> Encerrar evento / certificados</a>
+        <a href="{{ url_for('consulta_ocupacao') }}"><span class="nav-index">14</span> Ocupação de atividades</a>
+        <a href="{{ url_for('consulta_participacao') }}"><span class="nav-index">15</span> Participação por instituição</a>
+        <a href="{{ url_for('relatorio') }}"><span class="nav-index">16</span> Relatório de eventos</a>
       </div>
       {% endif %}
       {% if perfil == 'ADMIN' %}
       <div class="nav-group">
         <span class="nav-label">Administração</span>
-        <a href="{{ url_for('usuario_novo') }}"><span class="nav-index">14</span> Criar usuário</a>
-        <a href="{{ url_for('auditoria') }}"><span class="nav-index">15</span> Auditoria</a>
+        <a href="{{ url_for('usuario_novo') }}"><span class="nav-index">17</span> Criar usuário</a>
+        <a href="{{ url_for('auditoria') }}"><span class="nav-index">18</span> Auditoria</a>
       </div>
       {% endif %}
     </nav>
