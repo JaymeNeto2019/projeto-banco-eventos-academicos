@@ -9,7 +9,7 @@ Projeto Final da disciplina **Laboratório de Banco de Dados — 2026/2** (UCB).
 - JOAO PEDRO CARNEIRO IBIAPINO
 - JAYME BERNARDINO DA SILVA NETO
 
-**Turma:** Ciência da Computação — **Grupo:** 10 — **Interlocutor:** [PREENCHER]
+**Turma:** Ciência da Computação — **Grupo:** 10 
 
 ## Tema e escopo
 Banco de dados para gestão de eventos acadêmicos, atividades, sessões, salas, participantes, organizadores, inscrições, histórico de status e certificados.
