@@ -60,3 +60,9 @@ CONTRAEXEMPLO (ESTUDO 2): LIKE com curinga no inicio NAO usa o indice como busca
    mediana 18.8 ms; plano:
    -> Filter: (pessoa.nome like '%Souza%')  (cost=5002 rows=5477) (actual time=5.33..23.1 rows=5001 loops=1)
        -> Covering index scan on pessoa using idx_pessoa_nome  (cost=5002 rows=49301) (actual time=0.0892..11.4 rows=50009 loops=1)
+
+
+EVIDÊNCIAS REAIS ADICIONAIS — MySQL Workbench 8.0.46, 31/10/2026
+Schema eventos_academicos; COUNT(*) exatos: pessoa 50.089; evento 2.040; atividade 6.080; sessao_atividade 6.100; inscricao_atividade 120.208.
+Capturas 47–53 mostram os planos antes/depois e o contraexemplo; captura 46 mostra a carga volumosa; captura 56 confirma os três índices presentes. Os valores de referência acima não são resultados atribuídos a esta máquina.
+O script 07 executou cada plano antes/depois uma vez na primeira passagem. Tentou-se repetir para mediana; a tentativa de remover idx_sessao_sala_inicio foi bloqueada pelo MySQL (erro 1553, índice requerido pela FK). Os índices idx_inscricao_data e idx_pessoa_nome foram restaurados; os três índices finais foram conferidos. Não se atribui mediana numérica a esta execução.

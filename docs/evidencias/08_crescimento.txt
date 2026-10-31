@@ -35,3 +35,7 @@ TOTAL                                               17.4   (~0.02 GB)
 
 Tabelas de maior movimento: inscricao_atividade e auditoria (>95% das linhas). Candidatas a particionamento/arquivamento por ano (data_inscricao, data_hora)
 se passarem de dezenas de milhoes de linhas; no volume projetado acima o crescimento e administravel sem particionar.
+
+
+ATUALIZAÇÃO DA CARGA REAL — MySQL Workbench 8.0.46, 31/10/2026
+Após 08_carga_volume.sql, COUNT(*) confirmou: pessoa 50.089; evento 2.040; atividade 6.080; sessao_atividade 6.100; inscricao_atividade 120.208; certificado 40. Os números aproximados de table_rows do information_schema não foram usados para essas contagens. Ver captura 55.
