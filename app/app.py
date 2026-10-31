@@ -1,6 +1,6 @@
 """Aplicação web do projeto (Flask). O que se avalia aqui é o que ela revela sobre o BANCO:
 consultas parametrizadas, transações explícitas, erros de restrição tratados e acesso por perfil."""
-import os, secrets, functools
+import os, secrets, functools, re
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
@@ -71,31 +71,72 @@ def erro_banco(e):
 
 
 # ----------------------------------------------------------------- login / usuários
+# MELHORIAS_LOGIN_CADASTRO_PAINEL_V2
+# A conta AUTH apenas autentica e executa a procedure de cadastro publico.
+# Administradores criam contas de gestao por outra rota.
+
+def perfis_permitidos(*perfis_aceitos):
+    """Controle da interface; os GRANTs do MySQL continuam sendo a segunda camada."""
+    def decorator(f):
+        @functools.wraps(f)
+        @login_required
+        def wrapper(*args, **kwargs):
+            if session.get("perfil") not in perfis_aceitos:
+                abort(403)
+            return f(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
+somente_admin = perfis_permitidos("ADMIN")
+
+
+@app.errorhandler(403)
+def acesso_negado(_erro):
+    return render_template("erro.html", msg="Acesso negado por permissão: seu perfil não pode executar esta função."), 403
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    if session.get("perfil") in PERFIS and request.method == "GET":
+        return redirect(url_for("home"))
+
     if request.method == "POST":
         lg = request.form.get("login", "").strip()
-        senha = request.form.get("senha", "").encode()
-        try:
-            c = conectar("AUTH")  # conta mínima: só lê usuario_app e atualiza ultimo_login
-        except (KeyError, mysql.connector.Error) as e:
-            flash("A configuração do banco não está disponível. Preencha o arquivo .env e confira o MySQL.", "erro")
+        senha = request.form.get("senha", "")
+        if not lg or not senha:
+            flash("Informe usuário e senha.", "erro")
             return render_template("login.html")
         try:
-            rows = consultar(c, "SELECT id_usuario, senha_hash, perfil, ativo FROM usuario_app WHERE login = %s", (lg,))
-            u = rows[0] if rows else None
-            hash_ = u["senha_hash"].encode() if u else bcrypt.hashpw(b"x", bcrypt.gensalt())  # tempo parecido
-            ok = bcrypt.checkpw(senha, hash_) and u is not None and u["ativo"]
-            if ok:
-                executar(c, "UPDATE usuario_app SET ultimo_login = NOW() WHERE id_usuario = %s", (u["id_usuario"],))
-                c.commit()
-        finally:
-            c.close()
+            c = conectar("AUTH")
+            try:
+                rows = consultar(c,
+                    "SELECT id_usuario, senha_hash, perfil, ativo FROM usuario_app WHERE login = %s",
+                    (lg,))
+                u = rows[0] if rows else None
+                # Executa bcrypt mesmo em login inexistente para evitar diferença evidente de tempo.
+                stored = u["senha_hash"] if u else bcrypt.hashpw(b"x", bcrypt.gensalt()).decode()
+                hashed = stored if isinstance(stored, bytes) else stored.encode("utf-8")
+                try:
+                    valid = bcrypt.checkpw(senha.encode("utf-8"), hashed)
+                except (ValueError, TypeError):
+                    valid = False
+                ok = bool(u and u["ativo"] and u["perfil"] in PERFIS and valid)
+                if ok:
+                    executar(c, "UPDATE usuario_app SET ultimo_login = NOW() WHERE id_usuario = %s",
+                             (u["id_usuario"],))
+                    c.commit()
+            finally:
+                c.close()
+        except (KeyError, mysql.connector.Error):
+            flash("Não foi possível conectar ao banco. Confira o MySQL, as permissões e o .env.", "erro")
+            return render_template("login.html")
         if ok:
             session.clear()
             session.update(login=lg, perfil=u["perfil"], _csrf=secrets.token_hex(16))
-            return redirect(url_for("agenda" if u["perfil"] == "CONSULTA" else "home"))
-        flash("Login ou senha inválidos.", "erro")
+            flash("Bem-vindo à Agenda Acadêmica!", "ok")
+            return redirect(url_for("home"))
+        flash("Usuário ou senha inválidos, ou conta inativa.", "erro")
     return render_template("login.html")
 
 
@@ -106,25 +147,82 @@ def logout():
 
 
 def hash_senha(senha: str) -> str:
-    """bcrypt gera o SAL aleatório e o embute no hash ($2b$12$<sal><hash>)."""
-    return bcrypt.hashpw(senha.encode(), bcrypt.gensalt(rounds=12)).decode()
+    """Senha bcrypt com salt embutido, nunca em texto simples no banco."""
+    return bcrypt.hashpw(senha.encode("utf-8"), bcrypt.gensalt(rounds=12)).decode("ascii")
+
+
+def validar_conta(lg, senha, confirmar):
+    if not re.fullmatch(r"[A-Za-z0-9_.-]{3,60}", lg):
+        return "O login deve ter 3 a 60 caracteres: letras, números, ponto, hífen ou _."
+    if not (8 <= len(senha) and len(senha.encode("utf-8")) <= 72):
+        return "A senha deve ter no mínimo 8 caracteres e no máximo 72 bytes."
+    if senha != confirmar:
+        return "As senhas digitadas não coincidem."
+    return None
+
+
+@app.route("/cadastro", methods=["GET", "POST"])
+def cadastro():
+    """Auto-cadastro de CONSULTA. Nunca aceita perfil informado pelo navegador."""
+    if session.get("perfil") in PERFIS:
+        return redirect(url_for("home"))
+    if request.method == "POST":
+        lg = request.form.get("login", "").strip()
+        senha = request.form.get("senha", "")
+        erro = validar_conta(lg, senha, request.form.get("confirmar", ""))
+        if erro:
+            flash(erro, "erro")
+            return render_template("cadastro.html")
+        try:
+            c = conectar("AUTH")
+            try:
+                # Procedure no MySQL fixa perfil = CONSULTA e recusa perfis privilegiados.
+                executar(c, "CALL cadastrar_usuario_publico(%s, %s)", (lg, hash_senha(senha)))
+                c.commit()
+            except mysql.connector.Error:
+                c.rollback()
+                raise
+            finally:
+                c.close()
+        except mysql.connector.IntegrityError as exc:
+            if exc.errno == 1062:
+                flash("Este login já está em uso. Escolha outro.", "erro")
+            else:
+                flash(mensagem_erro(exc), "erro")
+            return render_template("cadastro.html")
+        except (KeyError, mysql.connector.Error):
+            flash("Cadastro indisponível. O administrador precisa configurar o MySQL e executar sql/11_cadastro_publico.sql.", "erro")
+            return render_template("cadastro.html")
+        session.clear()
+        session.update(login=lg, perfil="CONSULTA", _csrf=secrets.token_hex(16))
+        flash("Conta criada com sucesso!", "ok")
+        return redirect(url_for("home"))
+    return render_template("cadastro.html")
 
 
 @app.route("/usuarios/novo", methods=["GET", "POST"])
-@login_required
+@somente_admin
 def usuario_novo():
     if request.method == "POST":
-        lg, senha, perf = request.form["login"].strip(), request.form["senha"], request.form["perfil"]
-        if len(lg) < 3 or len(senha) < 8 or perf not in PERFIS:
-            flash("Login com 3+ caracteres, senha com 8+ e perfil válido são obrigatórios.", "erro")
+        lg = request.form.get("login", "").strip()
+        senha = request.form.get("senha", "")
+        perf = request.form.get("perfil", "")
+        erro = validar_conta(lg, senha, request.form.get("confirmar", ""))
+        if perf not in PERFIS:
+            erro = "Perfil inválido."
+        if erro:
+            flash(erro, "erro")
         else:
-            executar(cn(), "INSERT INTO usuario_app (login, senha_hash, perfil) VALUES (%s, %s, %s)",
-                     (lg, hash_senha(senha), perf))
-            cn().commit()
-            flash(f"Usuário {lg} criado.", "ok")
-            return redirect(url_for("usuario_novo"))
+            try:
+                executar(cn(), "INSERT INTO usuario_app (login, senha_hash, perfil) VALUES (%s, %s, %s)",
+                         (lg, hash_senha(senha), perf))
+                cn().commit()
+                flash(f"Usuário {lg} criado com perfil {perf}.", "ok")
+                return redirect(url_for("usuario_novo"))
+            except mysql.connector.Error as exc:
+                cn().rollback()
+                flash(mensagem_erro(exc), "erro")
     return render_template("usuario_novo.html", perfis=PERFIS)
-
 
 @app.route("/")
 @login_required
@@ -176,15 +274,20 @@ def ent_or_404(nome):
 @app.route("/crud/<nome>")
 @login_required
 def crud_lista(nome):
+    if session.get("perfil") == "CONSULTA":
+        abort(403)
     e = ent_or_404(nome)
     sql = f"SELECT {', '.join(e['lista'])} FROM {nome} ORDER BY {e['ordem']} LIMIT 200"  # identificadores fixos do config
-    return render_template("crud_lista.html", nome=nome, e=e, rows=consultar(cn(), sql))
+    pode_editar = (session["perfil"] == "ADMIN" or (session["perfil"] == "ORGANIZADOR" and nome in ("evento", "atividade")))
+    return render_template("crud_lista.html", nome=nome, e=e, rows=consultar(cn(), sql), pode_editar=pode_editar)
 
 
 @app.route("/crud/<nome>/novo", methods=["GET", "POST"])
 @app.route("/crud/<nome>/<int:pk>/editar", methods=["GET", "POST"])
 @login_required
 def crud_form(nome, pk=None):
+    if not (session["perfil"] == "ADMIN" or (session["perfil"] == "ORGANIZADOR" and nome in ("evento", "atividade"))):
+        abort(403)
     e = ent_or_404(nome)
     valores = {}
     if request.method == "POST":
@@ -217,7 +320,7 @@ def crud_form(nome, pk=None):
 
 
 @app.post("/crud/<nome>/<int:pk>/excluir")
-@login_required
+@somente_admin
 def crud_excluir(nome, pk):
     e = ent_or_404(nome)
     try:
@@ -237,7 +340,7 @@ def nulo(v):
 
 
 @app.route("/consulta/ocupacao")
-@login_required
+@perfis_permitidos("ADMIN", "ORGANIZADOR")
 def consulta_ocupacao():
     f = {k: nulo(request.args.get(k)) for k in ("tipo", "de", "ate")}
     minimo = nulo(request.args.get("minimo")) or "0"
@@ -266,7 +369,7 @@ def consulta_ocupacao():
 
 
 @app.route("/consulta/participacao")
-@login_required
+@perfis_permitidos("ADMIN", "ORGANIZADOR")
 def consulta_participacao():
     tipo, inst = nulo(request.args.get("tipo")), nulo(request.args.get("instituicao"))
     minimo = nulo(request.args.get("minimo")) or "0"
@@ -294,7 +397,7 @@ def consulta_participacao():
 
 # ----------------------------------------------------------------- relatório (view) e telas por perfil
 @app.route("/relatorio")
-@login_required
+@perfis_permitidos("ADMIN", "ORGANIZADOR")
 def relatorio():
     rows = consultar(cn(), "SELECT * FROM vw_relatorio_eventos ORDER BY data_inicio DESC LIMIT 200")
     return render_template("consulta.html", titulo="Relatório consolidado de eventos", campos=[], rows=rows,
@@ -320,7 +423,7 @@ def validar_certificado():
 
 
 @app.route("/auditoria")
-@login_required
+@perfis_permitidos("ADMIN")
 def auditoria():
     rows = consultar(cn(), "SELECT id_auditoria, tabela_afetada, chave_registro, autor, data_hora, "
                            "valor_anterior, valor_posterior FROM auditoria ORDER BY id_auditoria DESC LIMIT 100")
@@ -334,7 +437,7 @@ class FalhaSimulada(Exception):
 
 
 @app.route("/operacoes/inscrever", methods=["GET", "POST"])
-@login_required
+@perfis_permitidos("ADMIN", "ORGANIZADOR")
 def op_inscrever():
     """Inscrição com controle de vagas. FOR UPDATE trava a atividade: duas inscrições simultâneas
     não ultrapassam o limite. 'pausa' segura o bloqueio para o experimento de concorrência (B3)."""
@@ -387,11 +490,13 @@ def op_inscrever():
                            campos=[dict(n="id_participante", r="ID do participante", t="number"),
                                    dict(n="id_atividade", r="ID da atividade", t="number"),
                                    dict(n="pausa", r="Segurar o bloqueio por N segundos (experimento de concorrência)", t="number")],
-                           info="Tabelas: atividade (trava), inscricao_atividade (insere).")
+                           info="Tabelas: atividade (trava), inscricao_atividade (insere).",
+                            participantes=consultar(cn(), "SELECT pa.id_pessoa, pe.nome FROM participante pa JOIN pessoa pe ON pe.id_pessoa = pa.id_pessoa ORDER BY pe.nome LIMIT 300"),
+                            atividades=consultar(cn(), "SELECT id_atividade, titulo FROM atividade ORDER BY id_atividade DESC LIMIT 300"))
 
 
 @app.route("/operacoes/encerrar-evento", methods=["GET", "POST"])
-@login_required
+@perfis_permitidos("ADMIN", "ORGANIZADOR")
 def op_encerrar():
     """Operação central do B1: em UMA transação, muda o status do evento (historico_status_evento)
     e emite certificados (certificado). Se qualquer passo falhar, nada fica gravado."""
@@ -442,8 +547,12 @@ def op_encerrar():
     return render_template("operacao.html", titulo="Encerrar evento e emitir certificados", acao=url_for("op_encerrar"),
                            campos=[dict(n="id_evento", r="ID do evento", t="number"),
                                    dict(n="minimo", r="Presença mínima (%)", t="number")],
-                           info="Tabelas alteradas na mesma transação: historico_status_evento e certificado.")
+                           info="Tabelas alteradas na mesma transação: historico_status_evento e certificado.",
+                            eventos=consultar(cn(), "SELECT id_evento, titulo FROM evento ORDER BY data_inicio DESC LIMIT 300"))
 
+
+from melhorias_rotas import registrar_rotas
+registrar_rotas(app, cn, consultar, executar, mensagem_erro, perfis_permitidos)
 
 if __name__ == "__main__":
     app.run(debug=False, port=5000)
