@@ -1,8 +1,9 @@
 {% extends 'base.html' %}
-{% block titulo %}{{ e.titulo }} | Agenda Acadêmica{% endblock %}
+{% block titulo %}{{ e.titulo }} | Conecta Acadêmico{% endblock %}
 {% block conteudo %}
 <div class="page-heading"><h1>{{ e.titulo }}</h1><p>{% if pode_editar %}Gerencie os registros desta área.{% else %}Visualização somente leitura para seu perfil.{% endif %}</p></div>
 {% if pode_editar %}<p><a class="btn" href="{{ url_for('crud_form', nome=nome) }}">+ Novo registro</a></p>{% endif %}
+{% if nome == 'evento' %}<p><a class="btn s" href="{{ url_for('op_abrir') }}">Abrir inscrições de um evento</a></p>{% endif %}
 {% if rows %}
 <div class="wrap"><table><thead><tr>{% for k in e.lista %}<th>{{ k.replace('_',' ')|capitalize }}</th>{% endfor %}{% if pode_editar %}<th>Ações</th>{% endif %}</tr></thead>
 <tbody>{% for r in rows %}<tr>{% for k in e.lista %}<td>{{ '' if r[k] is none else r[k] }}</td>{% endfor %}

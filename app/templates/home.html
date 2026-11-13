@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% block titulo %}Painel principal | Agenda Acadêmica{% endblock %}
+{% block titulo %}Painel principal | Conecta Acadêmico{% endblock %}
 {% block conteudo %}
 <div class="page-heading dashboard-heading">
   <div><div class="eyebrow">PAINEL PRINCIPAL</div><h1>Olá, {{ login }}!</h1>
@@ -27,6 +27,7 @@
 <section class="dashboard-grid">
   {% for label, endpoint, descricao in [
     ('Cadastrar participante','participantes_lista','Criar pessoas e participantes'),
+    ('Abrir inscrições','op_abrir','Publicar evento com atividade e responsável'),
     ('Inscrever participante','op_inscrever','Controle de vagas e lista de espera'),
     ('Inscrições realizadas','inscricoes_lista','Listar e acompanhar inscrições'),
     ('Registrar presença','presencas','Atualizar presença para emissão de certificados'),

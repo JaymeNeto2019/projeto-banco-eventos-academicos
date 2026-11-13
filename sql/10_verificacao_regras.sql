@@ -54,4 +54,5 @@ LEFT JOIN inscricao_atividade ia ON ia.id_atividade = a.id_atividade AND ia.id_p
      AND ia.status_inscricao = 'CONFIRMADA'
 GROUP BY c.id_certificado, c.id_participante, c.id_evento, st.status_atual
 HAVING st.status_atual IS NULL OR st.status_atual <> 'ENCERRADO'
+    OR COUNT(ia.percentual_presenca) <> COUNT(ia.id_atividade)
     OR AVG(ia.percentual_presenca) IS NULL OR AVG(ia.percentual_presenca) < 75;

@@ -5,6 +5,7 @@ Usam a conexão por perfil e as tabelas ORIGINAIS do projeto.
 from decimal import Decimal, InvalidOperation
 import mysql.connector
 from flask import abort, flash, redirect, render_template, request, url_for
+from negocio import RegraNegocio, travar_evento
 
 
 def registrar_rotas(app, cn, consultar, executar, mensagem_erro, perfis_permitidos):
@@ -23,7 +24,6 @@ def registrar_rotas(app, cn, consultar, executar, mensagem_erro, perfis_permitid
             nome = request.form.get('nome', '').strip()
             email = request.form.get('email', '').strip()
             matricula = request.form.get('matricula_academica', '').strip()
-            tipo = request.form.get('tipo_participante', '').strip()
             tipo = request.form.get('tipo_participante', '').strip()
 
             if tipo == 'ALUNO' and not matricula:
@@ -77,6 +77,15 @@ def registrar_rotas(app, cn, consultar, executar, mensagem_erro, perfis_permitid
                 return redirect(url_for('presencas'))
             c = cn()
             try:
+                c.start_transaction()
+                atividades = consultar(c, 'SELECT id_evento FROM atividade WHERE id_atividade=%s', (atividade,))
+                if not atividades:
+                    raise RegraNegocio('Atividade não encontrada.')
+                _, estado = travar_evento(c, atividades[0]['id_evento'])
+                if estado != 'ABERTO':
+                    raise RegraNegocio('Presença só pode ser alterada antes do encerramento, em evento ABERTO.')
+                if consultar(c, 'SELECT 1 FROM certificado WHERE id_participante=%s AND id_evento=%s LIMIT 1', (pessoa, atividades[0]['id_evento'])):
+                    raise RegraNegocio('Este participante já possui certificado; a presença está bloqueada.')
                 qtd, _ = executar(c, """UPDATE inscricao_atividade SET percentual_presenca = %s
                     WHERE id_participante = %s AND id_atividade = %s AND status_inscricao = 'CONFIRMADA'""",
                     (percentual, pessoa, atividade))
@@ -86,12 +95,17 @@ def registrar_rotas(app, cn, consultar, executar, mensagem_erro, perfis_permitid
             except mysql.connector.Error as exc:
                 c.rollback()
                 flash(mensagem_erro(exc), 'erro')
+            except RegraNegocio as exc:
+                c.rollback()
+                flash(str(exc), 'erro')
             return redirect(url_for('presencas'))
         rows = consultar(cn(), """SELECT ia.id_participante, pe.nome AS participante,
                 ia.id_atividade, a.titulo AS atividade, ia.percentual_presenca
             FROM inscricao_atividade ia
             JOIN pessoa pe ON pe.id_pessoa = ia.id_participante
             JOIN atividade a ON a.id_atividade = ia.id_atividade
-            WHERE ia.status_inscricao = 'CONFIRMADA'
+            JOIN vw_evento_status_atual st ON st.id_evento=a.id_evento
+            WHERE ia.status_inscricao = 'CONFIRMADA' AND st.status_atual='ABERTO'
+              AND NOT EXISTS (SELECT 1 FROM certificado ce WHERE ce.id_evento=a.id_evento AND ce.id_participante=ia.id_participante)
             ORDER BY a.titulo, pe.nome LIMIT 300""")
         return render_template('presencas.html', rows=rows)

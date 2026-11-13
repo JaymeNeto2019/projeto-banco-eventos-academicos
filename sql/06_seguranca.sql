@@ -62,6 +62,8 @@ GRANT SELECT, INSERT, UPDATE         ON eventos_academicos.usuario_app          
 GRANT SELECT                         ON eventos_academicos.auditoria               TO 'r_admin_eventos';
 GRANT SELECT ON eventos_academicos.vw_evento_status_atual TO 'r_admin_eventos';
 GRANT SELECT ON eventos_academicos.vw_relatorio_eventos   TO 'r_admin_eventos';
+GRANT SELECT ON eventos_academicos.vw_agenda_publica TO 'r_admin_eventos';
+GRANT SELECT ON eventos_academicos.vw_validacao_certificado TO 'r_admin_eventos';
 
 -- ---- r_organizador: opera os eventos do dia a dia ---------------------
 -- Lê o domínio, cadastra/atualiza o que a operação exige e NÃO apaga dados
@@ -71,7 +73,7 @@ GRANT SELECT ON eventos_academicos.instituicao             TO 'r_organizador';
 GRANT SELECT ON eventos_academicos.organizador             TO 'r_organizador';
 GRANT SELECT ON eventos_academicos.categoria_evento        TO 'r_organizador';
 GRANT SELECT ON eventos_academicos.sala                    TO 'r_organizador';
-GRANT SELECT ON eventos_academicos.organizacao_evento      TO 'r_organizador';
+GRANT SELECT, INSERT, UPDATE ON eventos_academicos.organizacao_evento TO 'r_organizador';
 GRANT SELECT, INSERT, UPDATE ON eventos_academicos.participante            TO 'r_organizador';
 GRANT SELECT, INSERT, UPDATE ON eventos_academicos.evento                  TO 'r_organizador';
 GRANT SELECT, INSERT, UPDATE ON eventos_academicos.historico_status_evento TO 'r_organizador';
@@ -84,6 +86,8 @@ GRANT SELECT, INSERT, UPDATE ON eventos_academicos.certificado TO 'r_organizador
 REVOKE UPDATE ON eventos_academicos.certificado FROM 'r_organizador';
 GRANT SELECT ON eventos_academicos.vw_evento_status_atual TO 'r_organizador';
 GRANT SELECT ON eventos_academicos.vw_relatorio_eventos   TO 'r_organizador';
+GRANT SELECT ON eventos_academicos.vw_agenda_publica TO 'r_organizador';
+GRANT SELECT ON eventos_academicos.vw_validacao_certificado TO 'r_organizador';
 
 -- ---- r_consulta: público externo; só enxerga as visões de restrição ----
 GRANT SELECT ON eventos_academicos.vw_agenda_publica          TO 'r_consulta';

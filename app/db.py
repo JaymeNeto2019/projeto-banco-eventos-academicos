@@ -1,9 +1,10 @@
 """Camada de acesso a dados. Toda consulta usa parâmetros (%s): NUNCA concatene valores no SQL."""
 import os, re
+from pathlib import Path
 import mysql.connector
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parent.parent / '.env')
 
 # Cada perfil da aplicação usa uma conta MySQL diferente (princípio do menor privilégio).
 _CONTAS = {
@@ -23,7 +24,12 @@ def conectar(perfil, usuario_app=None):
         password=os.environ[pass_k],
         database=os.getenv("DB_NAME", "eventos_academicos"),
         autocommit=False,
+        connection_timeout=10,
     )
+    # Leituras após aguardar bloqueios devem enxergar as transações já confirmadas.
+    cur = cn.cursor()
+    cur.execute('SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED')
+    cur.close()
     if usuario_app:  # lido pelos gatilhos de auditoria (05_triggers.sql)
         cur = cn.cursor()
         cur.execute("SET @usuario_app = %s", (usuario_app,))
@@ -82,6 +88,8 @@ REGRAS = {
 def mensagem_erro(e):
     n = getattr(e, "errno", None)
     txt = str(e)
+    if n == 1644 and getattr(e, 'msg', '').startswith('RN18:'):
+        return 'RN18: as vagas da atividade devem respeitar a capacidade das salas.'
     m = re.search(r"CONSTRAINT `(\w+)`", txt) or re.search(r"[Cc]heck constraint '(\w+)'", txt) \
         or re.search(r"for key '(?:\w+\.)?(\w+)'", txt)
     regra = m.group(1) if m else None

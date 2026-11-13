@@ -50,7 +50,8 @@ check("CRUD: alterar sala", total("SELECT capacidade AS n FROM sala WHERE id_sal
 post(adm, f"/crud/sala/{sid}/excluir")
 check("CRUD: excluir sala", total("SELECT COUNT(*) AS n FROM sala WHERE id_sala=%s", (sid,)) == 0)
 cat = total("SELECT MIN(id_categoria) AS n FROM categoria_evento"); inst = total("SELECT MIN(id_instituicao) AS n FROM instituicao")
-post(adm, "/crud/evento/novo", dict(id_categoria=cat, id_instituicao_promotora=inst, titulo="Evento CRUD Teste", data_inicio="2026-12-15T08:00",
+responsavel = total('SELECT MIN(id_pessoa) AS n FROM organizador WHERE ativo=TRUE')
+post(adm, "/crud/evento/novo", dict(id_categoria=cat, id_instituicao_promotora=inst, id_responsavel=responsavel, titulo="Evento CRUD Teste", data_inicio="2026-12-15T08:00",
      data_fim="2026-12-15T12:00", modalidade="ONLINE", valor_inscricao="0.00", gratuito="on"))
 check("RN12: evento criado pela aplicação nasce com status PLANEJADO no histórico",
       total("SELECT COUNT(*) AS n FROM historico_status_evento h JOIN evento e ON e.id_evento=h.id_evento WHERE e.titulo='Evento CRUD Teste' AND h.status='PLANEJADO'") >= 1)
@@ -71,7 +72,7 @@ import uuid
 _c = conectar("ADMIN", "t_admin"); _cur = _c.cursor()  # dados fictícios só para o teste
 _cur.execute("INSERT INTO evento (id_categoria, id_instituicao_promotora, titulo, data_inicio, data_fim, modalidade) "
              "SELECT (SELECT MIN(id_categoria) FROM categoria_evento), (SELECT MIN(id_instituicao) FROM instituicao), "
-             "'Evento Teste Fumaça', '2026-12-10 08:00', '2026-12-10 12:00', 'ONLINE'")
+             "'Evento Teste Fumaça', DATE_ADD(TIMESTAMP(CURRENT_DATE,'08:00'),INTERVAL 60 DAY), DATE_ADD(TIMESTAMP(CURRENT_DATE,'12:00'),INTERVAL 60 DAY), 'ONLINE'")
 ev = _cur.lastrowid
 _cur.execute("INSERT INTO historico_status_evento (id_evento, sequencia, status, data_hora) VALUES (%s, 1, 'ABERTO', NOW())", (ev,))
 _cur.execute("INSERT INTO atividade (id_evento, titulo, tipo_atividade, carga_horaria, vagas) VALUES (%s, 'Atividade Teste', 'OFICINA', 2.0, 10)", (ev,))
@@ -84,7 +85,7 @@ _cur.execute("INSERT INTO participante (id_pessoa, tipo_participante) VALUES (%s
 _cur.execute("INSERT INTO inscricao_atividade (id_participante, id_atividade, data_inscricao, status_inscricao, percentual_presenca) VALUES (%s, %s, NOW(), 'CONFIRMADA', 50)", (part2, ativ))
 _cur.execute("SELECT MIN(id_sala) FROM sala"); sala = _cur.fetchone()[0]   # 2a atividade com sessao SOBREPOSTA (RN22)
 _cur.execute("INSERT INTO atividade (id_evento,titulo,tipo_atividade,carga_horaria,vagas) VALUES (%s,'Atividade Sobreposta','OFICINA',2.0,10)", (ev,)); ativ2 = _cur.lastrowid
-_cur.execute("INSERT INTO sessao_atividade (id_atividade,numero_sessao,id_sala,inicio,fim) VALUES (%s,1,%s,'2026-12-10 09:00','2026-12-10 11:00'),(%s,1,%s,'2026-12-10 10:00','2026-12-10 12:00')", (ativ, sala, ativ2, sala))
+_cur.execute("INSERT INTO sessao_atividade (id_atividade,numero_sessao,id_sala,inicio,fim) VALUES (%s,1,%s,DATE_ADD(TIMESTAMP(CURRENT_DATE,'09:00'),INTERVAL 60 DAY),DATE_ADD(TIMESTAMP(CURRENT_DATE,'11:00'),INTERVAL 60 DAY)),(%s,1,%s,DATE_ADD(TIMESTAMP(CURRENT_DATE,'10:00'),INTERVAL 60 DAY),DATE_ADD(TIMESTAMP(CURRENT_DATE,'12:00'),INTERVAL 60 DAY))", (ativ, sala, ativ2, sala))
 _c.commit(); _c.close()
 
 antes = total("SELECT COUNT(*) AS n FROM inscricao_atividade")

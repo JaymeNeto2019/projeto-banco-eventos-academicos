@@ -1,4 +1,4 @@
-# Sistema de Gestão de Eventos Acadêmicos
+# Conecta Acadêmico — Gestão de Eventos Acadêmicos
 
 Projeto Final da disciplina **Laboratório de Banco de Dados — 2026/2** (UCB). Etapa 1: projeto e construção do banco. Etapa 2: operação, interface e desempenho.
 
@@ -15,6 +15,12 @@ Projeto Final da disciplina **Laboratório de Banco de Dados — 2026/2** (UCB).
 Banco de dados para gestão de eventos acadêmicos, atividades, sessões, salas, participantes, organizadores, inscrições, histórico de status e certificados.
 
 **SGBD:** MySQL 8.0 ou superior. **Aplicação:** Python 3.10+ / Flask.
+
+## Atualização de segurança e integridade
+
+Para uma base existente, siga [docs/ATUALIZACAO_SEGURANCA.md](docs/ATUALIZACAO_SEGURANCA.md).
+O `.env` é privado e é gerado por `python configurar_ambiente.py`; somente `.env.example` é público.
+O SQL `12_integridade.sql` atualiza permissões e gatilhos sem apagar o banco.
 
 ## Estrutura
 ```
@@ -39,10 +45,10 @@ repositorio/
 
 ## Como executar
 **Banco** (como administrador do MySQL, nesta ordem): `01_ddl.sql` → `02_carga.sql` → `03_consultas.sql` → `04_views.sql` → `05_triggers.sql` → `06_seguranca.sql` → `06_usuarios.local.sql`
-(cópia de `06_usuarios.exemplo.sql` com senhas reais, **fora do Git**) → `11_cadastro_publico.sql` (procedure do cadastro público, executar uma vez depois do 06). Se executar pela linha de comando, use `mysql --default-character-set=utf8mb4` (os scripts têm acentos; no Workbench não é preciso). Para os estudos de desempenho: `08_carga_volume.sql` e depois `07_estudo_indices.sql`.
+(gerado por `python configurar_ambiente.py`, **fora do Git**) → `11_cadastro_publico.sql` → `12_integridade.sql`. O `01_ddl.sql` apaga o esquema: use-o apenas na instalação inicial em base descartável/vazia. Se executar pela linha de comando, use `mysql --default-character-set=utf8mb4`. Para os estudos de desempenho, use um banco separado: `08_carga_volume.sql` e depois `07_estudo_indices.sql`.
 
-**Aplicação:** siga o passo a passo de [`app/README.md`](app/README.md) (venv, `pip install -r requirements.txt`, `.env`, `python criar_usuario.py admin ADMIN`, `python app.py`).
-Teste automático: `python teste_fumaca.py` (reexecute e use o total impresso; foi escrito para a versão anterior da interface).
+**Aplicação:** siga [`app/README.md`](app/README.md) (venv, `pip install -r requirements-lock.txt`, `.env`, `python criar_usuario.py admin ADMIN`, `python app.py`).
+Testes: `python app/teste_fumaca.py` e, em banco descartável, `ALLOW_TEST_DATABASE=1 python -m unittest discover -s tests -v` (PowerShell: `$env:ALLOW_TEST_DATABASE='1'` antes do comando). GitHub Actions executa as suítes em MySQL separado.
 
 **Melhorias de interface:** tela de login revisada, cadastro público em `/cadastro` (cria apenas perfil CONSULTA, via procedure com `EXECUTE` limitado), painel inicial com atalhos, participantes, inscrições e presença. As permissões do MySQL continuam sendo a camada principal; ver `docs/MELHORIAS_INTERFACE.md`.
 

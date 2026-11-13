@@ -144,7 +144,7 @@ WITH status_ordenado AS (
     SELECT h.*,
            ROW_NUMBER() OVER (
               PARTITION BY h.id_evento
-              ORDER BY h.data_hora DESC, h.sequencia DESC
+              ORDER BY h.sequencia DESC
            ) AS rn
     FROM historico_status_evento h
 )
@@ -171,7 +171,7 @@ WITH status_atual AS (
         SELECT h.id_evento, h.status,
                ROW_NUMBER() OVER (
                    PARTITION BY h.id_evento
-                   ORDER BY h.data_hora DESC, h.sequencia DESC
+                   ORDER BY h.sequencia DESC
                ) AS rn
         FROM historico_status_evento h
     ) x
@@ -183,8 +183,8 @@ WITH status_atual AS (
     FROM inscricao_atividade ia
     JOIN atividade a ON a.id_atividade = ia.id_atividade
     WHERE ia.status_inscricao = 'CONFIRMADA'
-      AND ia.percentual_presenca IS NOT NULL
     GROUP BY ia.id_participante, a.id_evento
+    HAVING COUNT(ia.percentual_presenca) = COUNT(*)
 )
 SELECT pe.id_pessoa, pe.nome, e.id_evento, e.titulo,
        ROUND(pr.media_presenca,2) AS media_presenca

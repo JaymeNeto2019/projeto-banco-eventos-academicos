@@ -7,7 +7,14 @@ CNF="${BACKUP_CNF:-$DIR/backup.cnf}"
 DEST="${BACKUP_DIR:-$DIR/dumps}"
 DB="${DB_NAME:-eventos_academicos}"
 TMP="${DB}_restore_test"
-ARQ="$(ls -1t "$DEST"/${DB}_*.sql.gz | head -1)"
+[[ "$DB" =~ ^[A-Za-z0-9_]+$ ]] || { echo 'Nome de banco inválido'; exit 1; }
+[ -f "$CNF" ] || { echo "Falta $CNF"; exit 1; }
+ARQ=""
+for candidato in "$DEST"/"${DB}"_*.sql.gz; do
+  [ -f "$candidato" ] || continue
+  if [ -z "$ARQ" ] || [ "$candidato" -nt "$ARQ" ]; then ARQ="$candidato"; fi
+done
+[ -n "$ARQ" ] || { echo 'Nenhum backup encontrado'; exit 1; }
 M() { mysql --defaults-extra-file="$CNF" -N -B "$@"; }
 
 echo "Restaurando $ARQ em $TMP ..."
@@ -20,6 +27,16 @@ for t in $(M -e "SELECT table_name FROM information_schema.tables WHERE table_sc
   [ "$a" = "$b" ] && s="ok" || { s="DIFERENTE"; ok=0; }
   printf "%-28s original=%-8s restaurado=%-8s %s\n" "$t" "$a" "$b" "$s"
 done
-echo "Gatilhos no restaurado: $(M -e "SELECT COUNT(*) FROM information_schema.triggers WHERE trigger_schema='$TMP'") (original: $(M -e "SELECT COUNT(*) FROM information_schema.triggers WHERE trigger_schema='$DB'"))"
+for objeto in triggers routines views; do
+  case "$objeto" in
+    triggers) coluna=trigger_schema;;
+    routines) coluna=routine_schema;;
+    views) coluna=table_schema;;
+  esac
+  a=$(M -e "SELECT COUNT(*) FROM information_schema.$objeto WHERE $coluna='$DB'")
+  b=$(M -e "SELECT COUNT(*) FROM information_schema.$objeto WHERE $coluna='$TMP'")
+  printf '%s original=%s restaurado=%s\n' "$objeto" "$a" "$b"
+  [ "$a" = "$b" ] || ok=0
+done
 M -e "DROP DATABASE \`$TMP\`"
 [ $ok = 1 ] && echo "RESTAURAÇÃO VERIFICADA" || { echo "FALHA: contagens diferentes"; exit 1; }

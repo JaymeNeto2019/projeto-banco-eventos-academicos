@@ -8,5 +8,5 @@
 {% macro campo(c, valor='') %}
 <label for="{{ c.n }}">{{ c.r }}</label>
 {% if c.t == 'select' %}<select name="{{ c.n }}" id="{{ c.n }}">{% for o in c.opts %}<option value="{{ o }}" {{ 'selected' if o == valor }}>{{ o or '(todos)' }}</option>{% endfor %}</select>
-{% else %}<input name="{{ c.n }}" id="{{ c.n }}" type="{{ c.t }}" value="{{ valor if valor is not none else '' }}" {{ 'step=any' if c.t == 'number' }}>{% endif %}
+{% else %}<input name="{{ c.n }}" id="{{ c.n }}" type="{{ c.t }}" value="{{ valor if valor != '' and valor is not none else c.padrao|default('') }}" {% if c.min is defined %}min="{{ c.min }}"{% endif %} {% if c.max is defined %}max="{{ c.max }}"{% endif %} {{ 'step=any' if c.t == 'number' }}>{% endif %}
 {% endmacro %}

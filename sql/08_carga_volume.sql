@@ -40,7 +40,16 @@ SELECT cat.id_categoria, ins.id_instituicao, CONCAT('Evento sintético ', n.i),
 FROM n JOIN cat ON cat.rn = 1 + (n.i % cat.tot) JOIN ins ON ins.rn = 1 + (n.i % ins.tot);
 
 INSERT INTO historico_status_evento (id_evento, sequencia, status, data_hora)
-SELECT id_evento, 1, IF(data_inicio < NOW(), 'ENCERRADO', 'ABERTO'), DATE_SUB(data_inicio, INTERVAL 30 DAY)
+SELECT id_evento, 1, 'ABERTO', DATE_SUB(data_inicio, INTERVAL 30 DAY)
+FROM evento WHERE titulo LIKE 'Evento sintético %';
+
+INSERT INTO historico_status_evento (id_evento, sequencia, status, data_hora)
+SELECT id_evento, 2, 'ENCERRADO', data_fim FROM evento
+WHERE titulo LIKE 'Evento sintético %' AND data_fim < NOW();
+
+INSERT INTO organizacao_evento (id_organizador,id_evento,papel,data_inicio_atuacao,responsavel_principal)
+SELECT (SELECT MIN(id_pessoa) FROM organizador WHERE ativo=TRUE), id_evento,
+       'Responsável sintético', DATE(DATE_SUB(data_inicio, INTERVAL 30 DAY)), TRUE
 FROM evento WHERE titulo LIKE 'Evento sintético %';
 
 -- 3) Atividades (3 por evento) e uma sessão por atividade
@@ -73,11 +82,13 @@ SELECT ROW_NUMBER() OVER (ORDER BY id_atividade), id_atividade FROM atividade WH
 INSERT INTO inscricao_atividade (id_participante, id_atividade, data_inscricao, status_inscricao, percentual_presenca, nota_avaliacao)
 WITH RECURSIVE j AS (SELECT 1 AS j UNION ALL SELECT j + 1 FROM j WHERE j < 20)
 SELECT pa.id_pessoa, q.id_atividade,
-       DATE_ADD('2024-01-01 09:00:00', INTERVAL (q.arn * 3 + q.j * 17) % 1000 DAY),
+       DATE_SUB(e.data_inicio, INTERVAL 1 + ((q.arn + q.j) % 29) DAY),
        ELT(1 + q.m, 'CONFIRMADA', 'CONFIRMADA', 'CONFIRMADA', 'LISTA_ESPERA', 'CANCELADA'),
        IF(q.m < 3, 50 + (q.arn + q.j) % 51, NULL),
        IF(q.m < 3 AND (q.arn + q.j) % 3 = 0, 5 + (q.arn + q.j) % 6, NULL)
 FROM (SELECT t.rn AS arn, t.id_atividade, j.j, (t.rn + j.j) % 5 AS m FROM tmp_at t JOIN j) q
+JOIN atividade a ON a.id_atividade=q.id_atividade
+JOIN evento e ON e.id_evento=a.id_evento
 JOIN tmp_pa pa ON pa.rn = 1 + ((q.arn * 37 + q.j * 101) % @tot);
 
 DROP TEMPORARY TABLE tmp_pa;

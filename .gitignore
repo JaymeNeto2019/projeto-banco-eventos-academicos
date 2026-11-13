@@ -1,5 +1,11 @@
 # Credenciais e segredos (NUNCA versionar)
 .env
+.env.*
+!.env.example
+*.local.sql
+*.local.sql.tmp
+.vscode/*.zip
+.backup_correcoes/
 sql/06_usuarios.local.sql
 backup/*.cnf
 backup/dumps/
@@ -7,5 +13,6 @@ backup/dumps/
 # Python
 __pycache__/
 *.pyc
+__pycachee__/
 .venv/
 venv/

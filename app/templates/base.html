@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#10382e">
-  <title>{% block titulo %}Agenda Acadêmica{% endblock %}</title>
+  <title>{% block titulo %}Conecta Acadêmico{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='site.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='melhorias.css') }}">
   <script src="{{ url_for('static', filename='site.js') }}" defer></script>
@@ -14,8 +14,8 @@
 <div class="app-shell">
   <aside class="app-header">
     <div class="brand">
-      <div class="brand-mark" aria-hidden="true">EA</div>
-      <div><strong>Agenda Acadêmica</strong><span>Eventos e participação</span></div>
+      <div class="brand-mark" aria-hidden="true">CA</div>
+      <div><strong>Conecta Acadêmico</strong><span>Eventos e participação</span></div>
     </div>
     <nav class="nav" aria-label="Navegação principal">
       <div class="nav-group">
@@ -33,6 +33,7 @@
       </div>
       <div class="nav-group">
         <span class="nav-label">Inscrições e resultados</span>
+        <a href="{{ url_for('op_abrir') }}"><span class="nav-index">→</span> Abrir inscrições</a>
         <a href="{{ url_for('participantes_lista') }}"><span class="nav-index">09</span> Participantes</a>
         <a href="{{ url_for('inscricoes_lista') }}"><span class="nav-index">10</span> Inscrições</a>
         <a href="{{ url_for('presencas') }}"><span class="nav-index">11</span> Registrar presença</a>

@@ -34,7 +34,9 @@ ENTIDADES = {
                 campo("limite_participantes", "Limite de participantes", "int", req=False),
                 campo("gratuito", "Gratuito", "bool", req=False),
                 campo("valor_inscricao", "Valor da inscrição", "dec", padrao="0.00"),
-                campo("url_evento", "URL do evento", req=False)]),
+                campo("url_evento", "URL do evento", req=False),
+                campo("id_responsavel", "Organizador responsável", "fk", virtual=True,
+                      q="SELECT o.id_pessoa AS v, p.nome AS t FROM organizador o JOIN pessoa p USING(id_pessoa) WHERE o.ativo=TRUE ORDER BY p.nome")]),
     "atividade": dict(
         titulo="Atividades", pk="id_atividade", ordem="id_atividade DESC",
         lista=["id_atividade", "id_evento", "titulo", "tipo_atividade", "carga_horaria", "vagas"],
