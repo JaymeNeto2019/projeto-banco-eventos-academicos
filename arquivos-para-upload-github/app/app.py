@@ -1,0 +1,624 @@
+"""Aplicação web do projeto (Flask). O que se avalia aqui é o que ela revela sobre o BANCO:
+consultas parametrizadas, transações explícitas, erros de restrição tratados e acesso por perfil."""
+import os, secrets, functools, re
+from datetime import datetime
+from decimal import Decimal, InvalidOperation
+
+import bcrypt
+import mysql.connector
+from flask import (Flask, abort, flash, g, redirect, render_template, request, session, url_for)
+
+from db import conectar, consultar, executar, mensagem_erro  # noqa: E402
+from entidades import ENTIDADES  # noqa: E402
+from negocio import RegraNegocio, inscrever, travar_evento, validar_edicao, salvar_responsavel
+
+app = Flask(__name__)
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "")
+if len(app.secret_key) < 32 or app.secret_key.lower().startswith(('troque', 'change')):
+    raise RuntimeError('Gere uma chave de sessão privada com python configurar_ambiente.py.')
+app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax",
+                  SESSION_COOKIE_SECURE=os.getenv('SESSION_COOKIE_SECURE', '0') == '1',
+                  MAX_CONTENT_LENGTH=1024 * 1024)
+PERFIS = ("ADMIN", "ORGANIZADOR", "CONSULTA")
+HASH_LOGIN_INEXISTENTE = bcrypt.hashpw(b'x', bcrypt.gensalt(rounds=12))
+
+
+# ----------------------------------------------------------------- infraestrutura
+def cn():
+    """Conexão do request, com a conta MySQL do PERFIL logado. O banco é quem barra o acesso indevido."""
+    if "cn" not in g:
+        g.cn = conectar(session["perfil"], session.get("login"))
+    return g.cn
+
+
+@app.teardown_appcontext
+def fechar(_exc):
+    c = g.pop("cn", None)
+    if c is not None:
+        try:
+            c.close()  # transação pendente é desfeita
+        except Exception:
+            pass
+
+
+@app.before_request
+def proteger_csrf():
+    if request.method == "POST":
+        tok = session.get("_csrf", "")
+        enviado = request.form.get("_csrf", "")
+        if not tok or not enviado.isascii() or not secrets.compare_digest(tok, enviado):
+            abort(400)
+
+
+@app.context_processor
+def contexto():
+    if "_csrf" not in session:
+        session["_csrf"] = secrets.token_hex(16)
+    return dict(csrf=session["_csrf"], perfil=session.get("perfil"), login=session.get("login"))
+
+
+def login_required(f):
+    @functools.wraps(f)
+    def w(*a, **k):
+        if not session.get('id_usuario'):
+            session.clear()
+            return redirect(url_for("login"))
+        if 'usuario_validado' not in g:
+            c = conectar('AUTH')
+            try:
+                rows = consultar(c, 'SELECT login, perfil, ativo FROM usuario_app WHERE id_usuario = %s',
+                                 (session['id_usuario'],))
+            finally:
+                c.close()
+            u = rows[0] if rows else None
+            if not u or not u['ativo'] or u['perfil'] not in PERFIS or u['perfil'] != session.get('perfil'):
+                session.clear()
+                flash('Seu acesso mudou ou foi desativado. Entre novamente.', 'erro')
+                return redirect(url_for('login'))
+            session['login'] = u['login']
+            g.usuario_validado = True
+        return f(*a, **k)
+    return w
+
+
+@app.errorhandler(mysql.connector.Error)
+def erro_banco(e):
+    msg = mensagem_erro(e)  # nunca mostramos a exceção bruta do driver ao usuário
+    if request.method == "POST":
+        flash(msg, "erro")
+        return redirect(request.referrer or url_for("home"))
+    return render_template("erro.html", msg=msg), 403 if getattr(e, "errno", 0) in (1142, 1143, 1044) else 400
+
+
+# ----------------------------------------------------------------- login / usuários
+# MELHORIAS_LOGIN_CADASTRO_PAINEL_V2
+# A conta AUTH apenas autentica e executa a procedure de cadastro publico.
+# Administradores criam contas de gestao por outra rota.
+
+def perfis_permitidos(*perfis_aceitos):
+    """Controle da interface; os GRANTs do MySQL continuam sendo a segunda camada."""
+    def decorator(f):
+        @functools.wraps(f)
+        @login_required
+        def wrapper(*args, **kwargs):
+            if session.get("perfil") not in perfis_aceitos:
+                abort(403)
+            return f(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
+somente_admin = perfis_permitidos("ADMIN")
+
+
+@app.errorhandler(403)
+def acesso_negado(_erro):
+    return render_template("erro.html", msg="Acesso negado por permissão: seu perfil não pode executar esta função."), 403
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if session.get("perfil") in PERFIS and request.method == "GET":
+        return redirect(url_for("home"))
+
+    if request.method == "POST":
+        lg = request.form.get("login", "").strip()
+        senha = request.form.get("senha", "")
+        if not lg or not senha:
+            flash("Informe usuário e senha.", "erro")
+            return render_template("login.html")
+        try:
+            c = conectar("AUTH")
+            try:
+                rows = consultar(c,
+                    "SELECT id_usuario, senha_hash, perfil, ativo FROM usuario_app WHERE login = %s",
+                    (lg,))
+                u = rows[0] if rows else None
+                # Executa bcrypt mesmo em login inexistente para evitar diferença evidente de tempo.
+                stored = u["senha_hash"] if u else HASH_LOGIN_INEXISTENTE
+                hashed = stored if isinstance(stored, bytes) else stored.encode("utf-8")
+                try:
+                    valid = bcrypt.checkpw(senha.encode("utf-8"), hashed)
+                except (ValueError, TypeError):
+                    valid = False
+                ok = bool(u and u["ativo"] and u["perfil"] in PERFIS and valid)
+                if ok:
+                    executar(c, "UPDATE usuario_app SET ultimo_login = NOW() WHERE id_usuario = %s",
+                             (u["id_usuario"],))
+                    c.commit()
+            finally:
+                c.close()
+        except (KeyError, mysql.connector.Error):
+            flash("Não foi possível conectar ao banco. Confira o MySQL, as permissões e o .env.", "erro")
+            return render_template("login.html")
+        if ok:
+            session.clear()
+            session.update(id_usuario=u['id_usuario'], login=lg, perfil=u["perfil"], _csrf=secrets.token_hex(16))
+            flash("Bem-vindo à Agenda Acadêmica!", "ok")
+            return redirect(url_for("home"))
+        flash("Usuário ou senha inválidos, ou conta inativa.", "erro")
+    return render_template("login.html")
+
+
+@app.post("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
+def hash_senha(senha: str) -> str:
+    """Senha bcrypt com salt embutido, nunca em texto simples no banco."""
+    return bcrypt.hashpw(senha.encode("utf-8"), bcrypt.gensalt(rounds=12)).decode("ascii")
+
+
+def validar_conta(lg, senha, confirmar):
+    if not re.fullmatch(r"[A-Za-z0-9_.-]{3,60}", lg):
+        return "O login deve ter 3 a 60 caracteres: letras, números, ponto, hífen ou _."
+    if not (8 <= len(senha) and len(senha.encode("utf-8")) <= 72):
+        return "A senha deve ter no mínimo 8 caracteres e no máximo 72 bytes."
+    if senha != confirmar:
+        return "As senhas digitadas não coincidem."
+    return None
+
+
+@app.route("/cadastro", methods=["GET", "POST"])
+def cadastro():
+    """Auto-cadastro de CONSULTA. Nunca aceita perfil informado pelo navegador."""
+    if session.get("perfil") in PERFIS:
+        return redirect(url_for("home"))
+    if request.method == "POST":
+        lg = request.form.get("login", "").strip()
+        senha = request.form.get("senha", "")
+        erro = validar_conta(lg, senha, request.form.get("confirmar", ""))
+        if erro:
+            flash(erro, "erro")
+            return render_template("cadastro.html")
+        try:
+            c = conectar("AUTH")
+            try:
+                # Procedure no MySQL fixa perfil = CONSULTA e recusa perfis privilegiados.
+                executar(c, "CALL cadastrar_usuario_publico(%s, %s)", (lg, hash_senha(senha)))
+                c.commit()
+                novo_usuario = consultar(c, 'SELECT id_usuario FROM usuario_app WHERE login = %s', (lg,))[0]
+            except mysql.connector.Error:
+                c.rollback()
+                raise
+            finally:
+                c.close()
+        except mysql.connector.IntegrityError as exc:
+            if exc.errno == 1062:
+                flash("Este login já está em uso. Escolha outro.", "erro")
+            else:
+                flash(mensagem_erro(exc), "erro")
+            return render_template("cadastro.html")
+        except (KeyError, mysql.connector.Error):
+            flash("Cadastro indisponível. O administrador precisa configurar o MySQL e executar sql/11_cadastro_publico.sql.", "erro")
+            return render_template("cadastro.html")
+        session.clear()
+        session.update(id_usuario=novo_usuario['id_usuario'], login=lg, perfil="CONSULTA", _csrf=secrets.token_hex(16))
+        flash("Conta criada com sucesso!", "ok")
+        return redirect(url_for("home"))
+    return render_template("cadastro.html")
+
+
+@app.route("/usuarios/novo", methods=["GET", "POST"])
+@somente_admin
+def usuario_novo():
+    if request.method == "POST":
+        lg = request.form.get("login", "").strip()
+        senha = request.form.get("senha", "")
+        perf = request.form.get("perfil", "")
+        erro = validar_conta(lg, senha, request.form.get("confirmar", ""))
+        if perf not in PERFIS:
+            erro = "Perfil inválido."
+        if erro:
+            flash(erro, "erro")
+        else:
+            try:
+                executar(cn(), "INSERT INTO usuario_app (login, senha_hash, perfil) VALUES (%s, %s, %s)",
+                         (lg, hash_senha(senha), perf))
+                cn().commit()
+                flash(f"Usuário {lg} criado com perfil {perf}.", "ok")
+                return redirect(url_for("usuario_novo"))
+            except mysql.connector.Error as exc:
+                cn().rollback()
+                flash(mensagem_erro(exc), "erro")
+    return render_template("usuario_novo.html", perfis=PERFIS)
+
+@app.route("/")
+@login_required
+def home():
+    return render_template("home.html", entidades=ENTIDADES)
+
+
+# ----------------------------------------------------------------- CRUD genérico
+def converter(c, bruto):
+    t = c["t"]
+    if t == "bool":
+        return 1 if bruto in ("on", "1", "true") else 0
+    if bruto is None or bruto.strip() == "":
+        return None
+    bruto = bruto.strip()
+    if t == "int":
+        return int(bruto)
+    if t == "dec":
+        valor = Decimal(bruto.replace(",", "."))
+        if not valor.is_finite():
+            raise ValueError('Número não finito')
+        return valor
+    if t == "datetime":
+        return bruto.replace("T", " ")
+    return bruto
+
+
+def ler_form(ent):
+    vals, erros = [], []
+    for c in ent["campos"]:
+        try:
+            v = converter(c, request.form.get(c["n"]))
+        except (ValueError, InvalidOperation):
+            erros.append(f"Valor inválido em «{c['r']}».")
+            v = None
+        if v is None and c["req"] and c["t"] != "bool":
+            erros.append(f"«{c['r']}» é obrigatório.")
+        vals.append(v)
+    return vals, erros
+
+
+def opcoes(ent):
+    return {c["n"]: consultar(cn(), c["q"]) for c in ent["campos"] if c["t"] == "fk"}
+
+
+def ent_or_404(nome):
+    if nome not in ENTIDADES:
+        abort(404)
+    return ENTIDADES[nome]
+
+
+@app.route("/crud/<nome>")
+@login_required
+def crud_lista(nome):
+    if session.get("perfil") == "CONSULTA":
+        abort(403)
+    e = ent_or_404(nome)
+    sql = f"SELECT {', '.join(e['lista'])} FROM {nome} ORDER BY {e['ordem']} LIMIT 200"  # identificadores fixos do config
+    pode_editar = (session["perfil"] == "ADMIN" or (session["perfil"] == "ORGANIZADOR" and nome in ("evento", "atividade")))
+    return render_template("crud_lista.html", nome=nome, e=e, rows=consultar(cn(), sql), pode_editar=pode_editar)
+
+
+@app.route("/crud/<nome>/novo", methods=["GET", "POST"])
+@app.route("/crud/<nome>/<int:pk>/editar", methods=["GET", "POST"])
+@login_required
+def crud_form(nome, pk=None):
+    if not (session["perfil"] == "ADMIN" or (session["perfil"] == "ORGANIZADOR" and nome in ("evento", "atividade"))):
+        abort(403)
+    e = ent_or_404(nome)
+    valores = {}
+    if request.method == "POST":
+        vals, erros = ler_form(e)
+        valores = request.form
+        if not erros:
+            dados = dict(zip((c['n'] for c in e['campos']), vals))
+            cols = [c["n"] for c in e["campos"] if not c.get('virtual')]
+            vals = [dados[col] for col in cols]
+            try:
+                cn().start_transaction()
+                validar_edicao(cn(), nome, pk, dados)
+                if pk is None:
+                    _, novo_id = executar(cn(), f"INSERT INTO {nome} ({', '.join(cols)}) VALUES ({', '.join(['%s'] * len(cols))})", vals)
+                    if nome == "evento":  # RN12: todo evento nasce com status inicial no histórico (mesma transação)
+                        executar(cn(), "INSERT INTO historico_status_evento (id_evento, sequencia, status, data_hora, observacao) "
+                                       "VALUES (%s, 1, 'PLANEJADO', NOW(), 'Criado pela aplicação')", (novo_id,))
+                else:
+                    executar(cn(), f"UPDATE {nome} SET {', '.join(c + ' = %s' for c in cols)} WHERE {e['pk']} = %s", vals + [pk])
+                if nome == 'evento':
+                    salvar_responsavel(cn(), pk if pk is not None else novo_id, dados['id_responsavel'])
+                cn().commit()
+                flash("Registro salvo.", "ok")
+                return redirect(url_for("crud_lista", nome=nome))
+            except mysql.connector.Error as ex:
+                cn().rollback()
+                erros.append(mensagem_erro(ex))
+            except RegraNegocio as ex:
+                cn().rollback()
+                erros.append(str(ex))
+        for m in erros:
+            flash(m, "erro")
+    elif pk is not None:
+        r = consultar(cn(), f"SELECT * FROM {nome} WHERE {e['pk']} = %s", (pk,))
+        if not r:
+            abort(404)
+        valores = {k: (v.strftime("%Y-%m-%dT%H:%M") if isinstance(v, datetime) else v) for k, v in r[0].items()}
+        if nome == 'evento':
+            responsavel = consultar(cn(), 'SELECT id_organizador FROM organizacao_evento WHERE id_evento=%s AND responsavel_principal=TRUE LIMIT 1', (pk,))
+            valores['id_responsavel'] = responsavel[0]['id_organizador'] if responsavel else None
+    return render_template("crud_form.html", nome=nome, e=e, pk=pk, v=valores, opc=opcoes(e))
+
+
+@app.post("/crud/<nome>/<int:pk>/excluir")
+@somente_admin
+def crud_excluir(nome, pk):
+    e = ent_or_404(nome)
+    try:
+        cn().start_transaction()
+        if nome == 'atividade':
+            atual = consultar(cn(), 'SELECT id_evento FROM atividade WHERE id_atividade=%s', (pk,))
+            if atual:
+                evento = atual[0]['id_evento']
+                _, estado = travar_evento(cn(), evento)
+                if estado in ('ENCERRADO', 'CANCELADO') or consultar(cn(), 'SELECT 1 FROM certificado WHERE id_evento=%s LIMIT 1', (evento,)):
+                    raise RegraNegocio('Não é possível excluir atividades de evento encerrado, cancelado ou já certificado.')
+                if estado == 'ABERTO' and consultar(cn(), 'SELECT COUNT(*) AS n FROM atividade WHERE id_evento=%s', (evento,))[0]['n'] <= 1:
+                    raise RegraNegocio('RN15: não é possível excluir a última atividade de um evento ABERTO.')
+        executar(cn(), f"DELETE FROM {nome} WHERE {e['pk']} = %s", (pk,))
+        cn().commit()
+        flash("Registro excluído.", "ok")
+    except mysql.connector.Error as ex:
+        cn().rollback()
+        flash(mensagem_erro(ex), "erro")
+    except RegraNegocio as ex:
+        cn().rollback()
+        flash(str(ex), 'erro')
+    return redirect(url_for("crud_lista", nome=nome))
+
+
+# ----------------------------------------------------------------- consultas parametrizadas (JOIN + agregação)
+def nulo(v):
+    v = (v or "").strip()
+    return v or None
+
+
+@app.route("/consulta/ocupacao")
+@perfis_permitidos("ADMIN", "ORGANIZADOR")
+def consulta_ocupacao():
+    f = {k: nulo(request.args.get(k)) for k in ("tipo", "de", "ate")}
+    minimo = nulo(request.args.get("minimo")) or "0"
+    rows = None
+    if request.args:
+        rows = consultar(cn(), """
+            SELECT e.titulo AS evento, a.titulo AS atividade, a.tipo_atividade AS tipo, a.vagas,
+                   COALESCE(SUM(ia.status_inscricao = 'CONFIRMADA'), 0)   AS confirmadas,
+                   COALESCE(SUM(ia.status_inscricao = 'LISTA_ESPERA'), 0) AS lista_espera,
+                   ROUND(100 * COALESCE(SUM(ia.status_inscricao = 'CONFIRMADA'), 0) / a.vagas, 1) AS ocupacao_pct
+            FROM atividade a
+            JOIN evento e ON e.id_evento = a.id_evento
+            LEFT JOIN inscricao_atividade ia ON ia.id_atividade = a.id_atividade
+            WHERE (%s IS NULL OR a.tipo_atividade = %s)
+              AND (%s IS NULL OR e.data_inicio >= %s)
+              AND (%s IS NULL OR e.data_inicio < DATE_ADD(%s, INTERVAL 1 DAY))
+            GROUP BY a.id_atividade, e.titulo, a.titulo, a.tipo_atividade, a.vagas
+            HAVING ocupacao_pct >= %s
+            ORDER BY ocupacao_pct DESC, e.titulo
+            LIMIT 200""", (f["tipo"], f["tipo"], f["de"], f["de"], f["ate"], f["ate"], minimo))
+    campos = [dict(n="tipo", r="Tipo de atividade", t="select", opts=["", "PALESTRA", "MINICURSO", "MESA_REDONDA", "OFICINA"]),
+              dict(n="de", r="Evento a partir de", t="date"), dict(n="ate", r="Evento até", t="date"),
+              dict(n="minimo", r="Ocupação mínima (%)", t="number")]
+    return render_template("consulta.html", titulo="Ocupação das atividades", campos=campos, rows=rows,
+                           v=dict(request.args), sql_info="JOIN + LEFT JOIN + GROUP BY + HAVING")
+
+
+@app.route("/consulta/participacao")
+@perfis_permitidos("ADMIN", "ORGANIZADOR")
+def consulta_participacao():
+    tipo, inst = nulo(request.args.get("tipo")), nulo(request.args.get("instituicao"))
+    minimo = nulo(request.args.get("minimo")) or "0"
+    rows = None
+    if request.args:
+        rows = consultar(cn(), """
+            SELECT COALESCE(i.sigla, '(sem instituição)') AS instituicao, pa.tipo_participante AS tipo,
+                   COUNT(DISTINCT pa.id_pessoa) AS participantes,
+                   COUNT(ia.id_atividade)       AS inscricoes_ativas
+            FROM participante pa
+            LEFT JOIN instituicao i ON i.id_instituicao = pa.id_instituicao_origem
+            LEFT JOIN inscricao_atividade ia ON ia.id_participante = pa.id_pessoa AND ia.status_inscricao <> 'CANCELADA'
+            WHERE (%s IS NULL OR pa.tipo_participante = %s)
+              AND (%s IS NULL OR i.sigla LIKE CONCAT('%%', %s, '%%'))
+            GROUP BY i.id_instituicao, i.sigla, pa.tipo_participante
+            HAVING COUNT(ia.id_atividade) >= %s
+            ORDER BY inscricoes_ativas DESC
+            LIMIT 200""", (tipo, tipo, inst, inst, minimo))
+    campos = [dict(n="tipo", r="Tipo de participante", t="select", opts=["", "ALUNO", "PROFESSOR", "EXTERNO"]),
+              dict(n="instituicao", r="Sigla da instituição contém", t="text"),
+              dict(n="minimo", r="Mínimo de inscrições", t="number")]
+    return render_template("consulta.html", titulo="Participação por instituição", campos=campos, rows=rows,
+                           v=dict(request.args), sql_info="LEFT JOIN + GROUP BY + HAVING + LIKE")
+
+
+# ----------------------------------------------------------------- relatório (view) e telas por perfil
+@app.route("/relatorio")
+@perfis_permitidos("ADMIN", "ORGANIZADOR")
+def relatorio():
+    rows = consultar(cn(), "SELECT * FROM vw_relatorio_eventos ORDER BY data_inicio DESC LIMIT 200")
+    return render_template("consulta.html", titulo="Relatório consolidado de eventos", campos=[], rows=rows,
+                           v={}, sql_info="alimentado pela view vw_relatorio_eventos")
+
+
+@app.route("/agenda")
+@login_required
+def agenda():
+    rows = consultar(cn(), "SELECT * FROM vw_agenda_publica ORDER BY inicio LIMIT 200")
+    return render_template("consulta.html", titulo="Agenda pública", campos=[], rows=rows, v={},
+                           sql_info="view vw_agenda_publica (sem dados pessoais, sem eventos cancelados)")
+
+
+@app.route("/certificados/validar")
+@login_required
+def validar_certificado():
+    cod = nulo(request.args.get("codigo"))
+    rows = consultar(cn(), "SELECT * FROM vw_validacao_certificado WHERE codigo_validacao = %s", (cod,)) if cod else None
+    campos = [dict(n="codigo", r="Código de validação", t="text")]
+    return render_template("consulta.html", titulo="Validar certificado", campos=campos, rows=rows,
+                           v=dict(request.args), sql_info="view vw_validacao_certificado (titular mascarado)")
+
+
+@app.route("/auditoria")
+@perfis_permitidos("ADMIN")
+def auditoria():
+    rows = consultar(cn(), "SELECT id_auditoria, tabela_afetada, chave_registro, autor, data_hora, "
+                           "valor_anterior, valor_posterior FROM auditoria ORDER BY id_auditoria DESC LIMIT 100")
+    return render_template("consulta.html", titulo="Auditoria (últimas 100)", campos=[], rows=rows, v={},
+                           sql_info="tabela auditoria, preenchida pelos gatilhos")
+
+
+# ----------------------------------------------------------------- operações transacionais (B1/B3)
+class FalhaSimulada(Exception):
+    pass
+
+
+@app.route("/operacoes/inscrever", methods=["GET", "POST"])
+@perfis_permitidos("ADMIN", "ORGANIZADOR")
+def op_inscrever():
+    """Inscrição com bloqueio de evento, participante e atividade (ver negocio.py).
+    'pausa' segura os bloqueios para o experimento de concorrência (B3)."""
+    if request.method == "POST":
+        try:
+            part, ativ = int(request.form.get("id_participante", "")), int(request.form.get("id_atividade", ""))
+            pausa = min(max(int(request.form.get("pausa") or 0), 0), 30)
+        except ValueError:
+            flash("Informe números válidos.", "erro")
+            return redirect(url_for("op_inscrever"))
+        simular = request.form.get("simular_falha") == "on"
+        c = cn()
+        try:
+            c.start_transaction()  # BEGIN explícito
+            status = inscrever(c, part, ativ, pausa)
+            if simular:
+                raise FalhaSimulada()
+            c.commit()  # COMMIT
+            flash(f"Inscrição registrada como {status}.", "ok")
+        except FalhaSimulada:
+            c.rollback()  # ROLLBACK
+            flash("Falha simulada no meio da transação: ROLLBACK executado, nada foi gravado.", "erro")
+        except mysql.connector.Error as ex:
+            c.rollback()
+            flash(mensagem_erro(ex), "erro")
+        except RegraNegocio as ex:
+            c.rollback()
+            flash(str(ex), 'erro')
+        return redirect(url_for("op_inscrever"))
+    return render_template("operacao.html", titulo="Inscrever participante em atividade", acao=url_for("op_inscrever"),
+                           campos=[dict(n="id_participante", r="ID do participante", t="number"),
+                                   dict(n="id_atividade", r="ID da atividade", t="number"),
+                                   dict(n="pausa", r="Segurar o bloqueio por N segundos (experimento de concorrência)", t="number")],
+                           info="Tabelas: atividade (trava), inscricao_atividade (insere).",
+                            participantes=consultar(cn(), "SELECT pa.id_pessoa, pe.nome FROM participante pa JOIN pessoa pe ON pe.id_pessoa = pa.id_pessoa ORDER BY pe.nome LIMIT 300"),
+                            atividades=consultar(cn(), "SELECT a.id_atividade, a.titulo FROM atividade a JOIN evento e USING(id_evento) JOIN vw_evento_status_atual st USING(id_evento) WHERE st.status_atual='ABERTO' AND e.data_inicio>NOW() ORDER BY a.id_atividade DESC LIMIT 300"))
+
+
+@app.route("/operacoes/encerrar-evento", methods=["GET", "POST"])
+@perfis_permitidos("ADMIN", "ORGANIZADOR")
+def op_encerrar():
+    """Operação central do B1: em UMA transação, muda o status do evento (historico_status_evento)
+    e emite certificados (certificado). Se qualquer passo falhar, nada fica gravado."""
+    if request.method == "POST":
+        try:
+            ev, minimo = int(request.form.get("id_evento", "")), Decimal(request.form.get("minimo") or "75")
+            if not minimo.is_finite() or not 75 <= minimo <= 100:
+                raise ValueError('Presença mínima fora do intervalo')
+        except (ValueError, InvalidOperation):
+            flash("Informe o evento e uma presença mínima entre 75 e 100%.", "erro")
+            return redirect(url_for("op_encerrar"))
+        simular = request.form.get("simular_falha") == "on"
+        c = cn()
+        try:
+            c.start_transaction()
+            _, estado = travar_evento(c, ev)
+            if estado in ('CANCELADO', 'ENCERRADO'):
+                raise RegraNegocio(f'Evento {estado.lower()} não pode ser encerrado novamente.')
+            if estado != 'ABERTO':
+                raise RegraNegocio('Somente um evento ABERTO pode ser encerrado.')
+            executar(c, "INSERT INTO historico_status_evento (id_evento, sequencia, status, data_hora, observacao) "
+                        "SELECT %s, COALESCE(MAX(sequencia), 0) + 1, 'ENCERRADO', NOW(), 'Encerrado pela aplicação' "
+                        "FROM historico_status_evento WHERE id_evento = %s", (ev, ev))
+            n, _ = executar(c, """
+                INSERT INTO certificado (id_participante, id_evento, codigo_validacao, emitido_em, carga_horaria)
+                SELECT ia.id_participante, a.id_evento,
+                       CONCAT('CERT-', a.id_evento, '-', ia.id_participante, '-', UPPER(SUBSTRING(UUID(), 1, 8))),
+                       NOW(), SUM(a.carga_horaria)
+                FROM inscricao_atividade ia
+                JOIN atividade a ON a.id_atividade = ia.id_atividade
+                WHERE a.id_evento = %s AND ia.status_inscricao = 'CONFIRMADA'
+                GROUP BY ia.id_participante, a.id_evento
+                HAVING COUNT(ia.percentual_presenca) = COUNT(*)      -- presença registrada em TODAS as atividades confirmadas
+                   AND AVG(ia.percentual_presenca) >= %s""", (ev, minimo))   # RN26: média de presença >= mínimo
+            if simular:
+                raise FalhaSimulada()
+            c.commit()
+            flash(f"Evento encerrado e {n} certificado(s) emitido(s).", "ok")
+        except FalhaSimulada:
+            c.rollback()
+            flash("Falha simulada depois de gravar o status e os certificados: ROLLBACK executado, banco íntegro.", "erro")
+        except mysql.connector.Error as ex:
+            c.rollback()  # ex.: certificados já emitidos (uq_certificado_participante_evento) desfaz também o status
+            flash(mensagem_erro(ex), "erro")
+        except RegraNegocio as ex:
+            c.rollback()
+            flash(str(ex), 'erro')
+        return redirect(url_for("op_encerrar"))
+    return render_template("operacao.html", titulo="Encerrar evento e emitir certificados", acao=url_for("op_encerrar"),
+                           campos=[dict(n="id_evento", r="ID do evento", t="number"),
+                                   dict(n="minimo", r="Presença mínima (75 a 100%)", t="number", min=75, max=100, padrao=75)],
+                           info="Tabelas alteradas na mesma transação: historico_status_evento e certificado.",
+                            eventos=consultar(cn(), "SELECT id_evento, titulo FROM evento ORDER BY data_inicio DESC LIMIT 300"))
+
+
+@app.route('/operacoes/abrir-evento', methods=['GET', 'POST'])
+@perfis_permitidos('ADMIN', 'ORGANIZADOR')
+def op_abrir():
+    if request.method == 'POST':
+        try:
+            ev = int(request.form.get('id_evento', ''))
+        except ValueError:
+            flash('Informe um evento válido.', 'erro')
+            return redirect(url_for('op_abrir'))
+        c = cn()
+        try:
+            c.start_transaction()
+            evento, estado = travar_evento(c, ev)
+            if estado != 'PLANEJADO' or not evento['aceita_inscricao']:
+                raise RegraNegocio('Somente eventos PLANEJADOS que ainda não começaram podem abrir inscrições.')
+            if not consultar(c, 'SELECT 1 FROM atividade WHERE id_evento=%s LIMIT 1', (ev,)):
+                raise RegraNegocio('RN15: cadastre pelo menos uma atividade antes de abrir inscrições.')
+            if not consultar(c, 'SELECT 1 FROM organizacao_evento oe JOIN organizador o ON o.id_pessoa=oe.id_organizador WHERE oe.id_evento=%s AND oe.responsavel_principal=TRUE AND o.ativo=TRUE LIMIT 1', (ev,)):
+                raise RegraNegocio('RN24: defina um responsável principal ativo para o evento.')
+            executar(c, "INSERT INTO historico_status_evento (id_evento,sequencia,status,data_hora,observacao) SELECT %s,COALESCE(MAX(sequencia),0)+1,'ABERTO',NOW(),'Inscrições abertas pela aplicação' FROM historico_status_evento WHERE id_evento=%s", (ev, ev))
+            c.commit()
+            flash('Inscrições abertas.', 'ok')
+        except RegraNegocio as ex:
+            c.rollback()
+            flash(str(ex), 'erro')
+        except mysql.connector.Error as ex:
+            c.rollback()
+            flash(mensagem_erro(ex), 'erro')
+        return redirect(url_for('op_abrir'))
+    return render_template('operacao.html', titulo='Abrir inscrições do evento', acao=url_for('op_abrir'),
+                           campos=[dict(n='id_evento', r='Evento', t='number')],
+                           info='Escolha um evento planejado com atividades e responsável principal.',
+                           eventos=consultar(cn(), "SELECT e.id_evento,e.titulo FROM evento e JOIN vw_evento_status_atual st USING(id_evento) WHERE st.status_atual='PLANEJADO' AND e.data_inicio>NOW() ORDER BY e.data_inicio LIMIT 300"))
+
+
+from melhorias_rotas import registrar_rotas
+registrar_rotas(app, cn, consultar, executar, mensagem_erro, perfis_permitidos)
+
+if __name__ == "__main__":
+    app.run(debug=False, port=5000)
